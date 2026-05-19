@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -84,13 +84,13 @@ model Product {
   description   String
   specifications Json        @default("{}")
   variants      Json        @default("{}")
-  images        String[]    @default([])
+  images        String      @default("[]")
   stock         Int         @default(100)
   lowStock      Boolean     @default(false)
   rating        Float       @default(4.5)
   reviewsCount  Int         @default(0)
   soldCount     Int         @default(0)
-  tags          String[]    @default([])
+  tags          String      @default("[]")
   warranty      String      @default("1 an")
   returnPolicy  String      @default("Retour 15 jours")
   expressDelivery Boolean   @default(true)

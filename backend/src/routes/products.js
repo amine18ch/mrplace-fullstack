@@ -3,6 +3,17 @@ const { PrismaClient } = require('@prisma/client');
 const { auth, adminAuth } = require('../middleware/auth');
 const prisma = new PrismaClient();
 
+// SQLite stores String[] as JSON strings — parse them back
+const parseProduct = (p) => {
+  if (!p) return p;
+  return {
+    ...p,
+    images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || []),
+    tags:   typeof p.tags   === 'string' ? JSON.parse(p.tags)   : (p.tags   || []),
+  };
+};
+const parseProducts = (ps) => ps.map(parseProduct);
+
 // GET /api/products — liste avec filtres
 router.get('/', async (req, res) => {
   try {
@@ -52,7 +63,7 @@ router.get('/', async (req, res) => {
       }),
     ]);
 
-    res.json({ total, page: parseInt(page), limit: parseInt(limit), products });
+    res.json({ total, page: parseInt(page), limit: parseInt(limit), products: parseProducts(products) });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -72,10 +83,9 @@ router.get('/search/suggestions', async (req, res) => {
   if (cat && cat !== 'all') where.category = { slug: cat };
   const products = await prisma.product.findMany({
     where, take: 6,
-    select: { id:true, title:true, brand:true, price:true, images:true, category:true },
     include: { category: true },
   });
-  res.json(products);
+  res.json(parseProducts(products).map(p => ({ id:p.id, title:p.title, brand:p.brand, price:p.price, images:p.images, category:p.category })));
 });
 
 // GET /api/products/:id
@@ -89,7 +99,7 @@ router.get('/:id', async (req, res) => {
     },
   });
   if (!product) return res.status(404).json({ error: 'Produit introuvable' });
-  res.json(product);
+  res.json(parseProduct(product));
 });
 
 // POST /api/products/:id/reviews

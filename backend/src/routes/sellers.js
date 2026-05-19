@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
+const parseP = p => p ? { ...p, images: typeof p.images==='string'?JSON.parse(p.images):p.images||[], tags: typeof p.tags==='string'?JSON.parse(p.tags):p.tags||[] } : p;
 
 // GET /api/sellers
 router.get('/', async (req, res) => {
@@ -24,7 +25,7 @@ router.get('/:slug/products', async (req, res) => {
     include: { category: true },
     orderBy: { soldCount: 'desc' },
   });
-  res.json(products);
+  res.json(products.map(parseP));
 });
 
 module.exports = router;
