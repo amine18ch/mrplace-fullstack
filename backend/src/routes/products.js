@@ -3,14 +3,18 @@ const { PrismaClient } = require('@prisma/client');
 const { auth, adminAuth } = require('../middleware/auth');
 const prisma = new PrismaClient();
 
-// SQLite stores String[] as JSON strings — parse them back
+// SQLite stores arrays/objects as JSON strings — parse them back
 const parseProduct = (p) => {
   if (!p) return p;
-  return {
-    ...p,
-    images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || []),
-    tags:   typeof p.tags   === 'string' ? JSON.parse(p.tags)   : (p.tags   || []),
-  };
+  try {
+    return {
+      ...p,
+      images:         typeof p.images         === 'string' ? JSON.parse(p.images)         : (p.images || []),
+      tags:           typeof p.tags           === 'string' ? JSON.parse(p.tags)           : (p.tags || []),
+      specifications: typeof p.specifications === 'string' ? JSON.parse(p.specifications) : (p.specifications || {}),
+      variants:       typeof p.variants       === 'string' ? JSON.parse(p.variants)       : (p.variants || {}),
+    };
+  } catch { return p; }
 };
 const parseProducts = (ps) => ps.map(parseProduct);
 

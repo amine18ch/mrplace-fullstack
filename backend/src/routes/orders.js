@@ -39,8 +39,9 @@ router.post('/', auth, async (req, res) => {
         userId: req.user.id,
         subtotal, discount, shippingCost, vat, total,
         promoCode: promoCode?.toUpperCase() || null,
-        shippingAddress, paymentMethod,
-        items: { create: orderItems },
+        shippingAddress: JSON.stringify(shippingAddress),
+        paymentMethod,
+        items: { create: orderItems.map(it => ({ ...it, variant: JSON.stringify(it.variant) })) },
       },
       include: { items: { include: { product: true } } },
     });

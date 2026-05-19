@@ -10,7 +10,8 @@ router.get('/', auth, async (req, res) => {
     include: { product: { include: { seller: true, category: true } } },
     orderBy: { createdAt: 'asc' },
   });
-  res.json(items);
+  const parseP = p => p ? { ...p, images: typeof p.images==='string'?JSON.parse(p.images):p.images||[], tags: typeof p.tags==='string'?JSON.parse(p.tags):p.tags||[], specifications: typeof p.specifications==='string'?JSON.parse(p.specifications):p.specifications||{}, variants: typeof p.variants==='string'?JSON.parse(p.variants):p.variants||{} } : p;
+  res.json(items.map(it => ({ ...it, product: parseP(it.product) })));
 });
 
 // POST /api/cart — ajouter ou mettre à jour
@@ -22,8 +23,8 @@ router.post('/', auth, async (req, res) => {
 
   const item = await prisma.cartItem.upsert({
     where: { userId_productId: { userId: req.user.id, productId } },
-    update: { qty: { increment: qty }, variant },
-    create: { userId: req.user.id, productId, qty, variant },
+    update: { qty: { increment: qty }, variant: JSON.stringify(variant) },
+    create: { userId: req.user.id, productId, qty, variant: JSON.stringify(variant) },
     include: { product: { include: { seller: true } } },
   });
   res.json(item);
