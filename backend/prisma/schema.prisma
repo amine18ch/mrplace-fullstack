@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int       @id @default(autoincrement())
+  name        String
+  email       String    @unique
+  password    String
+  role        Role      @default(CLIENT)
+  phone       String?
+  avatar      String?
+  addresses   Address[]
+  cart        CartItem[]
+  wishlist    Wishlist[]
+  orders      Order[]
+  reviews     Review[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+enum Role {
+  CLIENT
+  SELLER
+  ADMIN
+}
+
+model Address {
+  id         Int     @id @default(autoincrement())
+  user       User    @relation(fields:[userId], references:[id], onDelete:Cascade)
+  userId     Int
+  name       String
+  phone      String
+  governorate String
+  area       String
+  building   String
+  street     String
+  notes      String?
+  isDefault  Boolean @default(false)
+}
+
+model Seller {
+  id            Int       @id @default(autoincrement())
+  name          String
+  slug          String    @unique
+  logo          String
+  color         String    @default("#2563EB")
+  rating        Float     @default(4.5)
+  reviewsCount  Int       @default(0)
+  verified      Boolean   @default(false)
+  badge         String    @default("Nouveau")
+  location      String
+  joinedYear    Int
+  productsCount Int       @default(0)
+  responseTime  String    @default("sous 24 heures")
+  products      Product[]
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String
+  slug     String    @unique
+  icon     String
+  products Product[]
+}
+
+model Product {
+  id            Int         @id @default(autoincrement())
+  title         String
+  brand         String
+  seller        Seller      @relation(fields:[sellerId], references:[id])
+  sellerId      Int
+  category      Category    @relation(fields:[categoryId], references:[id])
+  categoryId    Int
+  subcategory   String
+  price         Float
+  originalPrice Float
+  discount      Int         @default(0)
+  description   String
+  specifications Json        @default("{}")
+  variants      Json        @default("{}")
+  images        String[]    @default([])
+  stock         Int         @default(100)
+  lowStock      Boolean     @default(false)
+  rating        Float       @default(4.5)
+  reviewsCount  Int         @default(0)
+  soldCount     Int         @default(0)
+  tags          String[]    @default([])
+  warranty      String      @default("1 an")
+  returnPolicy  String      @default("Retour 15 jours")
+  expressDelivery Boolean   @default(true)
+  freeDelivery  Boolean     @default(true)
+  isActive      Boolean     @default(true)
+  cartItems     CartItem[]
+  wishlistItems Wishlist[]
+  orderItems    OrderItem[]
+  reviews       Review[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model CartItem {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields:[userId], references:[id], onDelete:Cascade)
+  userId    Int
+  product   Product  @relation(fields:[productId], references:[id])
+  productId Int
+  qty       Int      @default(1)
+  variant   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+model Wishlist {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields:[userId], references:[id], onDelete:Cascade)
+  userId    Int
+  product   Product  @relation(fields:[productId], references:[id])
+  productId Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
+
+model Order {
+  id             Int         @id @default(autoincrement())
+  user           User        @relation(fields:[userId], references:[id])
+  userId         Int
+  status         OrderStatus @default(EN_ATTENTE)
+  total          Float
+  subtotal       Float
+  discount       Float       @default(0)
+  shippingCost   Float       @default(0)
+  vat            Float       @default(0)
+  promoCode      String?
+  shippingAddress Json
+  paymentMethod  String
+  items          OrderItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+enum OrderStatus {
+  EN_ATTENTE
+  CONFIRMEE
+  EN_PREPARATION
+  EXPEDIEE
+  LIVREE
+  ANNULEE
+}
+
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  order     Order   @relation(fields:[orderId], references:[id])
+  orderId   Int
+  product   Product @relation(fields:[productId], references:[id])
+  productId Int
+  qty       Int
+  price     Float
+  variant   Json    @default("{}")
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields:[userId], references:[id])
+  userId    Int
+  product   Product  @relation(fields:[productId], references:[id])
+  productId Int
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+}
+
+model PromoCode {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  discount  Float
+  isActive  Boolean  @default(true)
+  uses      Int      @default(0)
+}
