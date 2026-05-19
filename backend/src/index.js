@@ -1,9 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const FRONTEND_DIST = path.join(__dirname, '../../frontend/dist');
 
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
@@ -27,6 +30,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'MrPlace API', time: new Date() });
 });
 
+// Serve frontend static files if dist exists
+if (fs.existsSync(FRONTEND_DIST)) {
+  app.use(express.static(FRONTEND_DIST));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
+  });
+  console.log(`📦 Serving frontend from ${FRONTEND_DIST}`);
+}
+
 app.listen(PORT, () => {
-  console.log(`🚀 MrPlace API running on port ${PORT}`);
+  console.log(`🚀 MrPlace running on port ${PORT}`);
 });
