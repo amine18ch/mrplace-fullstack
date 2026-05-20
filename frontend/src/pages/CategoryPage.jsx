@@ -29,12 +29,14 @@ const CategoryPage = ({ slug }) => {
   };
 
   useEffect(() => {
-    categoriesApi.brands(slug).then(setBrands);
+    if (!slug) return;
+    categoriesApi.brands(slug).then(setBrands).catch(() => setBrands([]));
   }, [slug]);
 
   useEffect(() => {
+    if (!slug) return;
     setLoading(true);
-    const params = { category: slug, sort };
+    const params = { category: slug, sort, limit: 40 };
     if (filters.minPrice) params.minPrice = filters.minPrice;
     if (filters.maxPrice) params.maxPrice = filters.maxPrice;
     if (filters.brands.length) params.brand = filters.brands.join(',');
@@ -43,12 +45,21 @@ const CategoryPage = ({ slug }) => {
     if (filters.express) params.express = 'true';
     if (filters.inStock) params.inStock = 'true';
 
-    productsApi.list(params).then(r => {
-      setProducts(r.products);
-      setTotal(r.total);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [slug, sort, filters]);
+    productsApi.list(params)
+      .then(r => {
+        setProducts(r.products || []);
+        setTotal(r.total || 0);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('[CategoryPage] erreur chargement:', err);
+        setLoading(false);
+      });
+  }, [slug, sort,
+    filters.minPrice, filters.maxPrice, filters.minRating,
+    filters.minDiscount, filters.express, filters.inStock,
+    filters.brands.join(','),
+  ]);
 
   const clearAll = () => setFilters({ minPrice:'', maxPrice:'', brands:[], minRating:0, minDiscount:0, express:false, inStock:false });
   const toggleBrand = (b) => setFilters(f => ({ ...f, brands: f.brands.includes(b) ? f.brands.filter(x=>x!==b) : [...f.brands,b] }));
