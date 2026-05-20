@@ -53,6 +53,8 @@ model Seller {
   productsCount Int       @default(0)
   responseTime  String    @default("sous 24 heures")
   products      Product[]
+  application   VendorApplication?
+  paymentCycles PaymentCycle[]
 }
 
 model Category {
@@ -136,6 +138,7 @@ model Order {
   shippingAddress String
   paymentMethod   String
   items           OrderItem[]
+  dispute         Dispute?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 }
@@ -168,4 +171,115 @@ model PromoCode {
   discount Float
   isActive Boolean @default(true)
   uses     Int     @default(0)
+}
+
+model AdminUser {
+  id                 Int        @id @default(autoincrement())
+  name               String
+  email              String     @unique
+  password           String
+  role               String     @default("SUPPORT")
+  permissions        String     @default("[]")
+  twoFactorEnabled   Boolean    @default(false)
+  twoFactorSecret    String?
+  isActive           Boolean    @default(true)
+  lastLogin          DateTime?
+  createdAt          DateTime   @default(now())
+  logs               AdminLog[]
+}
+
+model AdminLog {
+  id        Int       @id @default(autoincrement())
+  admin     AdminUser @relation(fields:[adminId], references:[id])
+  adminId   Int
+  action    String
+  module    String
+  targetId  String    @default("")
+  details   String    @default("{}")
+  ip        String    @default("")
+  createdAt DateTime  @default(now())
+}
+
+model VendorApplication {
+  id               Int      @id @default(autoincrement())
+  seller           Seller   @relation(fields:[sellerId], references:[id])
+  sellerId         Int      @unique
+  status           String   @default("PENDING")
+  companyName      String?
+  taxId            String?
+  bankAccount      String?
+  idDocument       String?
+  rejectionReason  String?
+  reviewedBy       Int?
+  reviewedAt       DateTime?
+  createdAt        DateTime @default(now())
+}
+
+model Commission {
+  id         Int      @id @default(autoincrement())
+  type       String   @default("GLOBAL")
+  sellerId   Int?
+  categoryId Int?
+  rate       Float    @default(0.10)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+model Dispute {
+  id          Int      @id @default(autoincrement())
+  order       Order    @relation(fields:[orderId], references:[id])
+  orderId     Int      @unique
+  userId      Int
+  sellerId    Int
+  reason      String
+  description String
+  status      String   @default("OPEN")
+  resolution  String?
+  resolvedBy  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Banner {
+  id        Int      @id @default(autoincrement())
+  title     String
+  imageUrl  String
+  linkUrl   String?
+  position  String   @default("HOME_HERO")
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model FlashSale {
+  id          Int      @id @default(autoincrement())
+  name        String
+  startAt     DateTime
+  endAt       DateTime
+  discountPct Int
+  isActive    Boolean  @default(true)
+  productIds  String   @default("[]")
+  createdAt   DateTime @default(now())
+}
+
+model PlatformSetting {
+  id        Int      @id @default(autoincrement())
+  key       String   @unique
+  value     String
+  group     String   @default("GENERAL")
+  updatedAt DateTime @updatedAt
+}
+
+model PaymentCycle {
+  id          Int      @id @default(autoincrement())
+  seller      Seller   @relation(fields:[sellerId], references:[id])
+  sellerId    Int
+  periodStart DateTime
+  periodEnd   DateTime
+  grossAmount Float
+  commission  Float
+  netAmount   Float
+  status      String   @default("PENDING")
+  paidAt      DateTime?
+  createdAt   DateTime @default(now())
 }

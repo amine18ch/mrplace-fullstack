@@ -27,9 +27,24 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'MrPlace API', time: new Date() });
 });
 
+// Admin routes
+const { adminAuth } = require('./middleware/adminAuth');
+app.use('/api/admin/auth',      require('./routes/admin/auth'));
+app.use('/api/admin/dashboard', adminAuth, require('./routes/admin/dashboard'));
+app.use('/api/admin/vendors',   adminAuth, require('./routes/admin/vendors'));
+app.use('/api/admin/products',  adminAuth, require('./routes/admin/products'));
+app.use('/api/admin/orders',    adminAuth, require('./routes/admin/orders'));
+app.use('/api/admin/customers', adminAuth, require('./routes/admin/customers'));
+app.use('/api/admin/finance',   adminAuth, require('./routes/admin/finance'));
+app.use('/api/admin/marketing', adminAuth, require('./routes/admin/marketing'));
+app.use('/api/admin/settings',  adminAuth, require('./routes/admin/settings'));
+
 // Serve frontend static files if dist exists
 if (fs.existsSync(FRONTEND_DIST)) {
   app.use(express.static(FRONTEND_DIST));
+  // Admin SPA fallback
+  app.get('/admin', (req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
+  app.get('/admin/*', (req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
   app.get('*', (req, res) => {
     res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
   });

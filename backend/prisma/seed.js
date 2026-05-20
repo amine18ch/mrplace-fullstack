@@ -126,6 +126,68 @@ async function main() {
     await prisma.promoCode.upsert({ where:{code:promo.code}, update:{}, create:promo });
   }
   console.log('✅ Promo codes created');
+
+  // Admin users
+  await prisma.adminUser.upsert({
+    where: { email: 'superadmin@mrplace.tn' },
+    update: {},
+    create: { name:'Super Admin', email:'superadmin@mrplace.tn', password: await bcrypt.hash('SuperAdmin@2024!', 10), role:'SUPER_ADMIN', permissions: JSON.stringify(['*']) }
+  });
+  await prisma.adminUser.upsert({
+    where: { email: 'mod@mrplace.tn' },
+    update: {},
+    create: { name:'Modérateur', email:'mod@mrplace.tn', password: await bcrypt.hash('Admin@2024!', 10), role:'MODERATEUR', permissions: JSON.stringify(['products', 'vendors', 'orders']) }
+  });
+  await prisma.adminUser.upsert({
+    where: { email: 'compta@mrplace.tn' },
+    update: {},
+    create: { name:'Comptable', email:'compta@mrplace.tn', password: await bcrypt.hash('Admin@2024!', 10), role:'COMPTABLE', permissions: JSON.stringify(['finance']) }
+  });
+  console.log('✅ Admin users created');
+
+  // Platform settings
+  for (const [key, value, group] of [
+    ['platform_name', 'MARKET', 'GENERAL'],
+    ['currency', 'TND', 'GENERAL'],
+    ['vat_rate', '19', 'FINANCE'],
+    ['commission_rate', '10', 'FINANCE'],
+    ['timezone', 'Africa/Tunis', 'GENERAL'],
+    ['contact_email', 'contact@mrplace.tn', 'GENERAL'],
+  ]) {
+    await prisma.platformSetting.upsert({ where: { key }, update: { value }, create: { key, value, group } });
+  }
+  console.log('✅ Platform settings created');
+
+  // VendorApplication for each seller
+  for (const seller of sellers) {
+    await prisma.vendorApplication.upsert({
+      where: { sellerId: seller.id },
+      update: {},
+      create: { sellerId: seller.id, status: 'APPROVED', reviewedAt: new Date() }
+    });
+  }
+  console.log('✅ Vendor applications created');
+
+  // Global commission
+  const existingCommission = await prisma.commission.findFirst({ where: { type: 'GLOBAL' } });
+  if (!existingCommission) {
+    await prisma.commission.create({ data: { type: 'GLOBAL', rate: 0.10, isActive: true } });
+  }
+  console.log('✅ Commission created');
+
+  // Demo banners
+  await prisma.banner.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1, title: 'Bienvenue sur MARKET', imageUrl: '🛍️', linkUrl: '/', position: 'HOME_HERO', isActive: true, sortOrder: 0 }
+  }).catch(() => prisma.banner.create({ data: { title: 'Bienvenue sur MARKET', imageUrl: '🛍️', linkUrl: '/', position: 'HOME_HERO', isActive: true, sortOrder: 0 } }));
+  await prisma.banner.upsert({
+    where: { id: 2 },
+    update: {},
+    create: { id: 2, title: 'Promotions de la saison', imageUrl: '🏷️', linkUrl: '/category/electronics', position: 'HOME_HERO', isActive: true, sortOrder: 1 }
+  }).catch(() => prisma.banner.create({ data: { title: 'Promotions de la saison', imageUrl: '🏷️', linkUrl: '/category/electronics', position: 'HOME_HERO', isActive: true, sortOrder: 1 } }));
+  console.log('✅ Banners created');
+
   console.log('🎉 Seed completed!');
 }
 

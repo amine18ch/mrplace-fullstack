@@ -1,3 +1,4 @@
+import AdminApp from './admin/AdminApp';
 import { AppProvider, useApp } from './context/AppContext';
 import { TopBar, Header, CategoryBar, Footer, Toasts, LoginModal } from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -6,6 +7,7 @@ import ProductPage from './pages/ProductPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import { WishlistPage, SellerPage, SearchPage, AccountPage, OrdersPage } from './pages/OtherPages';
+
 
 const Router = () => {
   const { currentPage, pageParams } = useApp();
@@ -39,6 +41,9 @@ const AppInner = () => (
 );
 
 export default function App() {
+  if (window.location.pathname.startsWith('/admin')) {
+    return <AdminApp />;
+  }
   return (
     <AppProvider>
       <AppInner />
