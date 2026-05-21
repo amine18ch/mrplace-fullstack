@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
-const { logAction } = require('../../middleware/adminAuth');
+const { adminAuth, requireRole, logAction } = require('../../middleware/adminAuth');
 const prisma = new PrismaClient();
+
+router.use(adminAuth);
 
 // GET /api/admin/orders/stats
 router.get('/stats', async (req, res) => {
@@ -18,7 +20,7 @@ router.get('/stats', async (req, res) => {
 });
 
 // GET /api/admin/orders/disputes
-router.get('/disputes', async (req, res) => {
+router.get('/disputes', requireRole('MODERATEUR', 'SUPPORT'), async (req, res) => {
   try {
     const disputes = await prisma.dispute.findMany({
       include: {
@@ -31,18 +33,35 @@ router.get('/disputes', async (req, res) => {
 });
 
 // POST /api/admin/orders/disputes
-router.post('/disputes', async (req, res) => {
+router.post('/disputes', requireRole('MODERATEUR', 'SUPPORT'), async (req, res) => {
   try {
     const { orderId, userId, sellerId, reason, description } = req.body;
     const dispute = await prisma.dispute.create({
       data: { orderId: parseInt(orderId), userId: parseInt(userId), sellerId: parseInt(sellerId), reason, description }
     });
+    await logAction(req.admin.id, 'CREATE_DISPUTE', 'orders', dispute.id, { orderId, reason }, req.ip);
+    res.json(dispute);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// PATCH /api/admin/orders/disputes/:id
+router.patch('/disputes/:id', requireRole('MODERATEUR', 'SUPPORT'), async (req, res) => {
+  try {
+    const { status, reviewerId } = req.body;
+    const data = {};
+    if (status !== undefined) data.status = status;
+    if (reviewerId !== undefined) data.reviewerId = parseInt(reviewerId);
+    const dispute = await prisma.dispute.update({
+      where: { id: parseInt(req.params.id) },
+      data
+    });
+    await logAction(req.admin.id, 'UPDATE_DISPUTE', 'orders', req.params.id, { status }, req.ip);
     res.json(dispute);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // PATCH /api/admin/orders/disputes/:id/resolve
-router.patch('/disputes/:id/resolve', async (req, res) => {
+router.patch('/disputes/:id/resolve', requireRole('MODERATEUR', 'SUPPORT'), async (req, res) => {
   try {
     const { resolution, refund } = req.body;
     const dispute = await prisma.dispute.update({
@@ -103,7 +122,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PATCH /api/admin/orders/:id/status
-router.patch('/:id/status', async (req, res) => {
+router.patch('/:id/status', requireRole('MODERATEUR', 'SUPPORT'), async (req, res) => {
   try {
     const { status } = req.body;
     const order = await prisma.order.update({ where: { id: parseInt(req.params.id) }, data: { status } });

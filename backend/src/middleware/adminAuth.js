@@ -22,6 +22,15 @@ const superAdminAuth = (req, res, next) => {
   });
 };
 
+const requireRole = (...roles) => (req, res, next) => {
+  if (!req.admin) return res.status(401).json({ error: 'Non authentifié' });
+  if (req.admin.role === 'SUPER_ADMIN') return next();
+  if (!roles.includes(req.admin.role)) {
+    return res.status(403).json({ error: `Rôle requis: ${roles.join(' ou ')}` });
+  }
+  next();
+};
+
 const logAction = async (adminId, action, module, targetId, details, ip) => {
   try {
     await prisma.adminLog.create({
@@ -37,4 +46,4 @@ const logAction = async (adminId, action, module, targetId, details, ip) => {
   } catch {}
 };
 
-module.exports = { adminAuth, superAdminAuth, logAction };
+module.exports = { adminAuth, superAdminAuth, requireRole, logAction };

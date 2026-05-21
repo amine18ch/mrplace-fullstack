@@ -1,6 +1,9 @@
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
+const { adminAuth } = require('../../middleware/adminAuth');
 const prisma = new PrismaClient();
+
+router.use(adminAuth);
 
 // GET /api/admin/dashboard/stats
 router.get('/stats', async (req, res) => {
@@ -11,9 +14,9 @@ router.get('/stats', async (req, res) => {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(now.getDate() - 30);
 
-    // Revenue
-    const [allOrders, todayOrders, weekOrders, monthOrders] = await Promise.all([
-      prisma.order.findMany({ select: { total: true, status: true, createdAt: true } }),
+    // Revenue - only LIVREE orders
+    const [deliveredOrders, todayOrders, weekOrders, monthOrders] = await Promise.all([
+      prisma.order.findMany({ where: { status: 'LIVREE' }, select: { total: true, status: true, createdAt: true } }),
       prisma.order.findMany({ where: { createdAt: { gte: todayStart } }, select: { total: true } }),
       prisma.order.findMany({ where: { createdAt: { gte: weekStart } }, select: { total: true } }),
       prisma.order.findMany({ where: { createdAt: { gte: monthStart } }, select: { total: true } }),
@@ -21,13 +24,14 @@ router.get('/stats', async (req, res) => {
 
     const sumTotal = (arr) => arr.reduce((s, o) => s + o.total, 0);
     const revenue = {
-      total: sumTotal(allOrders),
+      total: sumTotal(deliveredOrders),
       today: sumTotal(todayOrders),
       week: sumTotal(weekOrders),
       month: sumTotal(monthOrders),
     };
 
     // Orders by status
+    const allOrders = await prisma.order.findMany({ select: { status: true, total: true, createdAt: true } });
     const byStatus = {};
     allOrders.forEach(o => { byStatus[o.status] = (byStatus[o.status] || 0) + 1; });
     const orders = {
@@ -43,7 +47,8 @@ router.get('/stats', async (req, res) => {
       prisma.vendorApplication.findMany({ select: { status: true } }),
     ]);
     const pendingVendors = vendorApplications.filter(a => a.status === 'PENDING').length;
-    const vendors = { total: totalSellers, active: totalSellers - pendingVendors, pending: pendingVendors };
+    const approvedVendors = vendorApplications.filter(a => a.status === 'APPROVED').length;
+    const vendors = { total: totalSellers, active: approvedVendors, pending: pendingVendors };
 
     // Customers
     const [totalUsers, newUsers] = await Promise.all([
@@ -52,10 +57,16 @@ router.get('/stats', async (req, res) => {
     ]);
     const customers = { total: totalUsers, new: newUsers };
 
-    // Commissions
+    // Commissions (10% of delivered revenue)
     const globalCommission = await prisma.commission.findFirst({ where: { type: 'GLOBAL', isActive: true } });
     const commissionRate = globalCommission ? globalCommission.rate : 0.10;
     const commissions = revenue.total * commissionRate;
+
+    // Pending disputes count
+    const openDisputes = await prisma.dispute.count({ where: { status: 'OPEN' } });
+
+    // Pending payment cycles count
+    const pendingPaymentCycles = await prisma.paymentCycle.count({ where: { status: 'PENDING' } });
 
     // Top vendors
     const orderItems = await prisma.orderItem.findMany({
@@ -63,6 +74,7 @@ router.get('/stats', async (req, res) => {
     });
     const vendorMap = {};
     orderItems.forEach(item => {
+      if (!item.product?.seller) return;
       const sid = item.product.sellerId;
       if (!vendorMap[sid]) vendorMap[sid] = { seller: item.product.seller, revenue: 0, orders: new Set() };
       vendorMap[sid].revenue += item.price * item.qty;
@@ -86,14 +98,17 @@ router.get('/stats', async (req, res) => {
       .slice(0, 5);
 
     // Top categories
-    const categories = await prisma.category.findMany({ include: { products: { include: { orderItems: true } } } });
+    const categories = await prisma.category.findMany({
+      include: { products: { include: { orderItems: true } } }
+    });
     const topCategories = categories.map(cat => {
       const rev = cat.products.reduce((s, p) => s + p.orderItems.reduce((ss, i) => ss + i.price * i.qty, 0), 0);
-      return { id: cat.id, name: cat.name, icon: cat.icon, revenue: rev, productCount: cat.products.length };
+      const qty = cat.products.reduce((s, p) => s + p.orderItems.reduce((ss, i) => ss + i.qty, 0), 0);
+      return { id: cat.id, name: cat.name, icon: cat.icon, revenue: rev, productCount: cat.products.length, qty };
     }).sort((a, b) => b.revenue - a.revenue).slice(0, 6);
 
     // Sales by day (last 30 days)
-    const recentOrders = await prisma.order.findMany({
+    const recentOrdersForChart = await prisma.order.findMany({
       where: { createdAt: { gte: thirtyDaysAgo } },
       select: { total: true, createdAt: true },
       orderBy: { createdAt: 'asc' }
@@ -104,20 +119,24 @@ router.get('/stats', async (req, res) => {
       const key = d.toISOString().split('T')[0];
       dayMap[key] = { date: key, amount: 0, count: 0 };
     }
-    recentOrders.forEach(o => {
+    recentOrdersForChart.forEach(o => {
       const key = o.createdAt.toISOString().split('T')[0];
       if (dayMap[key]) { dayMap[key].amount += o.total; dayMap[key].count++; }
     });
     const salesByDay = Object.values(dayMap);
 
     // Recent orders
-    const recentOrdersFull = await prisma.order.findMany({
+    const recentOrders = await prisma.order.findMany({
       take: 10,
       orderBy: { createdAt: 'desc' },
       include: { user: { select: { name: true, email: true } }, items: { include: { product: { select: { title: true } } } } }
     });
 
-    res.json({ revenue, orders, vendors, customers, commissions, topVendors, topProducts, topCategories, salesByDay, recentOrders: recentOrdersFull });
+    res.json({
+      revenue, orders, vendors, customers, commissions,
+      openDisputes, pendingPaymentCycles,
+      topVendors, topProducts, topCategories, salesByDay, recentOrders
+    });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: e.message });

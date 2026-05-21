@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
-const { logAction } = require('../../middleware/adminAuth');
+const { adminAuth, requireRole, logAction } = require('../../middleware/adminAuth');
 const prisma = new PrismaClient();
+
+router.use(adminAuth);
 
 // GET /api/admin/products/stats
 router.get('/stats', async (req, res) => {
@@ -18,13 +20,32 @@ router.get('/stats', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// GET /api/admin/products/pending - products awaiting moderation
+router.get('/pending', async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const [products, total] = await Promise.all([
+      prisma.product.findMany({
+        where: { isActive: false },
+        skip, take: parseInt(limit),
+        include: { seller: { select: { name: true, logo: true } }, category: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.product.count({ where: { isActive: false } })
+    ]);
+    res.json({ products, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // GET /api/admin/products
 router.get('/', async (req, res) => {
   try {
     const { page = 1, limit = 20, isActive, sellerId, categoryId, search } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const where = {};
-    if (isActive !== undefined) where.isActive = isActive === 'true';
+    if (isActive === 'true') where.isActive = true;
+    else if (isActive === 'false') where.isActive = false;
     if (sellerId) where.sellerId = parseInt(sellerId);
     if (categoryId) where.categoryId = parseInt(categoryId);
     if (search) where.OR = [{ title: { contains: search } }, { brand: { contains: search } }];
@@ -54,7 +75,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // PATCH /api/admin/products/:id
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requireRole('MODERATEUR'), async (req, res) => {
   try {
     const { title, brand, price, originalPrice, stock, isActive, description } = req.body;
     const data = {};
@@ -72,7 +93,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 // PATCH /api/admin/products/:id/approve
-router.patch('/:id/approve', async (req, res) => {
+router.patch('/:id/approve', requireRole('MODERATEUR'), async (req, res) => {
   try {
     const product = await prisma.product.update({ where: { id: parseInt(req.params.id) }, data: { isActive: true } });
     await logAction(req.admin.id, 'APPROVE', 'products', req.params.id, {}, req.ip);
@@ -81,7 +102,7 @@ router.patch('/:id/approve', async (req, res) => {
 });
 
 // PATCH /api/admin/products/:id/reject
-router.patch('/:id/reject', async (req, res) => {
+router.patch('/:id/reject', requireRole('MODERATEUR'), async (req, res) => {
   try {
     const product = await prisma.product.update({ where: { id: parseInt(req.params.id) }, data: { isActive: false } });
     await logAction(req.admin.id, 'REJECT', 'products', req.params.id, { reason: req.body.reason }, req.ip);
@@ -90,7 +111,7 @@ router.patch('/:id/reject', async (req, res) => {
 });
 
 // PATCH /api/admin/products/:id/feature
-router.patch('/:id/feature', async (req, res) => {
+router.patch('/:id/feature', requireRole('MODERATEUR'), async (req, res) => {
   try {
     const product = await prisma.product.findUnique({ where: { id: parseInt(req.params.id) }, select: { tags: true } });
     const tags = JSON.parse(product.tags || '[]');
@@ -103,7 +124,7 @@ router.patch('/:id/feature', async (req, res) => {
 });
 
 // DELETE /api/admin/products/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('MODERATEUR'), async (req, res) => {
   try {
     await prisma.product.update({ where: { id: parseInt(req.params.id) }, data: { isActive: false } });
     await logAction(req.admin.id, 'DELETE', 'products', req.params.id, {}, req.ip);

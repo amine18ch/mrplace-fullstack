@@ -1,15 +1,22 @@
 import { useEffect, useState } from 'react';
 import { adminApi } from '../api/adminClient';
+import { useAdmin } from '../context/AdminContext';
 
 const fmt = (n) => new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n || 0);
 const fmtDate = (d) => new Date(d).toLocaleDateString('fr-TN', { day: '2-digit', month: '2-digit' });
 
 const STATUS_COLORS = {
-  EN_ATTENTE: 'bg-yellow-500/20 text-yellow-400',
-  CONFIRME: 'bg-blue-500/20 text-blue-400',
-  EXPEDIE: 'bg-purple-500/20 text-purple-400',
-  LIVRE: 'bg-green-500/20 text-green-400',
-  ANNULE: 'bg-red-500/20 text-red-400',
+  EN_ATTENTE:     'bg-yellow-500/20 text-yellow-400',
+  CONFIRMEE:      'bg-blue-500/20 text-blue-400',
+  EN_PREPARATION: 'bg-indigo-500/20 text-indigo-400',
+  EXPEDIEE:       'bg-purple-500/20 text-purple-400',
+  LIVREE:         'bg-green-500/20 text-green-400',
+  ANNULEE:        'bg-red-500/20 text-red-400',
+  // legacy
+  CONFIRME:       'bg-blue-500/20 text-blue-400',
+  EXPEDIE:        'bg-purple-500/20 text-purple-400',
+  LIVRE:          'bg-green-500/20 text-green-400',
+  ANNULE:         'bg-red-500/20 text-red-400',
 };
 
 // Line Chart SVG component
@@ -23,7 +30,7 @@ const LineChart = ({ data }) => {
 
   const maxVal = Math.max(...data.map(d => d.amount), 1);
   const pts = data.map((d, i) => ({
-    x: padL + (i / (data.length - 1)) * chartW,
+    x: padL + (i / Math.max(data.length - 1, 1)) * chartW,
     y: padT + chartH - (d.amount / maxVal) * chartH,
     ...d
   }));
@@ -43,9 +50,9 @@ const LineChart = ({ data }) => {
     y: padT + (i / ySteps) * chartH
   }));
 
-  const xLabels = data.filter((_, i) => i % 5 === 0).map((d, i) => ({
+  const xLabels = data.filter((_, i) => i % 5 === 0).map((d) => ({
     label: fmtDate(d.date),
-    x: padL + (data.indexOf(d) / (data.length - 1)) * chartW
+    x: padL + (data.indexOf(d) / Math.max(data.length - 1, 1)) * chartW
   }));
 
   return (
@@ -57,7 +64,6 @@ const LineChart = ({ data }) => {
             <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
           </linearGradient>
         </defs>
-        {/* Grid lines */}
         {yLabels.map((yl, i) => (
           <g key={i}>
             <line x1={padL} y1={yl.y} x2={W - padR} y2={yl.y} stroke="#1e293b" strokeWidth={1} />
@@ -66,31 +72,26 @@ const LineChart = ({ data }) => {
             </text>
           </g>
         ))}
-        {/* X labels */}
         {xLabels.map((xl, i) => (
           <text key={i} x={xl.x} y={H - 4} textAnchor="middle" fill="#475569" fontSize={9}>{xl.label}</text>
         ))}
-        {/* Area */}
         <path d={areaD} fill="url(#areaGrad)" />
-        {/* Line */}
         <path d={pathD} fill="none" stroke="#3b82f6" strokeWidth={2} strokeLinecap="round" />
-        {/* Hover points */}
         {pts.map((pt, i) => (
           <circle
             key={i}
             cx={pt.x} cy={pt.y} r={4}
             fill="#3b82f6" stroke="#0f172a" strokeWidth={2}
             className="cursor-pointer opacity-0 hover:opacity-100 transition-opacity"
-            onMouseEnter={(e) => setTooltip({ x: pt.x, y: pt.y, date: pt.date, amount: pt.amount, count: pt.count })}
+            onMouseEnter={() => setTooltip({ x: pt.x, y: pt.y, date: pt.date, amount: pt.amount, count: pt.count })}
             onMouseLeave={() => setTooltip(null)}
           />
         ))}
-        {/* Tooltip */}
         {tooltip && (
           <g>
-            <rect x={tooltip.x - 50} y={tooltip.y - 42} width={100} height={36} rx={6} fill="#1e293b" stroke="#334155" strokeWidth={1} />
-            <text x={tooltip.x} y={tooltip.y - 26} textAnchor="middle" fill="#94a3b8" fontSize={9}>{tooltip.date}</text>
-            <text x={tooltip.x} y={tooltip.y - 13} textAnchor="middle" fill="#f1f5f9" fontSize={11} fontWeight="bold">{fmt(tooltip.amount)} TND</text>
+            <rect x={Math.min(tooltip.x - 50, W - 110)} y={Math.max(tooltip.y - 42, 0)} width={100} height={36} rx={6} fill="#1e293b" stroke="#334155" strokeWidth={1} />
+            <text x={Math.min(tooltip.x, W - 60)} y={Math.max(tooltip.y - 26, 14)} textAnchor="middle" fill="#94a3b8" fontSize={9}>{tooltip.date}</text>
+            <text x={Math.min(tooltip.x, W - 60)} y={Math.max(tooltip.y - 13, 27)} textAnchor="middle" fill="#f1f5f9" fontSize={11} fontWeight="bold">{fmt(tooltip.amount)} TND</text>
           </g>
         )}
       </svg>
@@ -102,10 +103,11 @@ const LineChart = ({ data }) => {
 const BarChart = ({ data }) => {
   if (!data || data.length === 0) return <div className="h-40 flex items-center justify-center text-slate-600 text-sm">Pas de données</div>;
 
-  const W = 500, H = 130, padB = 30, padT = 10, padL = 10, padR = 10;
+  const W = 500, H = 130, padB = 35, padT = 20, padL = 10, padR = 10;
   const chartH = H - padT - padB;
   const maxVal = Math.max(...data.map(d => d.revenue), 1);
-  const barW = (W - padL - padR) / data.length - 6;
+  const totalW = W - padL - padR;
+  const barW = totalW / data.length - 6;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 160 }}>
@@ -116,14 +118,18 @@ const BarChart = ({ data }) => {
         </linearGradient>
       </defs>
       {data.map((d, i) => {
-        const bh = (d.revenue / maxVal) * chartH;
-        const x = padL + i * ((W - padL - padR) / data.length) + 3;
+        const bh = Math.max((d.revenue / maxVal) * chartH, 2);
+        const x = padL + i * (totalW / data.length) + 3;
         const y = padT + chartH - bh;
+        const labelVal = d.revenue > 999 ? `${Math.round(d.revenue / 1000)}k` : Math.round(d.revenue);
         return (
           <g key={i}>
             <rect x={x} y={y} width={barW} height={bh} rx={3} fill="url(#barGrad)" opacity={0.85} />
+            <text x={x + barW / 2} y={y - 4} textAnchor="middle" fill="#94a3b8" fontSize={8}>
+              {labelVal}
+            </text>
             <text x={x + barW / 2} y={H - 6} textAnchor="middle" fill="#475569" fontSize={9}>
-              {d.name?.length > 6 ? d.name.substring(0, 6) + '…' : d.name}
+              {d.name?.length > 7 ? d.name.substring(0, 6) + '…' : d.name}
             </text>
           </g>
         );
@@ -133,7 +139,7 @@ const BarChart = ({ data }) => {
 };
 
 const KpiCard = ({ title, value, sub, color, icon }) => (
-  <div className={`bg-slate-900 border border-slate-800 rounded-xl p-5`}>
+  <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
     <div className="flex items-start justify-between mb-3">
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>
         <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -148,6 +154,7 @@ const KpiCard = ({ title, value, sub, color, icon }) => (
 );
 
 export default function AdminDashboard() {
+  const { navigateAdmin, can } = useAdmin();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -173,19 +180,72 @@ export default function AdminDashboard() {
 
   if (!stats) return null;
 
+  const alerts = [];
+  if ((stats.orders?.pending || 0) > 0 && can('orders.read')) {
+    alerts.push({
+      type: 'yellow',
+      message: `${stats.orders.pending} commande(s) en attente`,
+      action: () => navigateAdmin('orders'),
+    });
+  }
+  if ((stats.openDisputes || 0) > 0 && can('disputes.write')) {
+    alerts.push({
+      type: 'orange',
+      message: `${stats.openDisputes} litige(s) ouvert(s)`,
+      action: () => navigateAdmin('orders'),
+    });
+  }
+  if ((stats.vendors?.pending || 0) > 0 && can('vendors.read')) {
+    alerts.push({
+      type: 'blue',
+      message: `${stats.vendors.pending} vendeur(s) en attente d'approbation`,
+      action: () => navigateAdmin('vendors'),
+    });
+  }
+  if ((stats.pendingPaymentCycles || 0) > 0 && can('finance.read')) {
+    alerts.push({
+      type: 'indigo',
+      message: `${stats.pendingPaymentCycles} cycle(s) de paiement en attente`,
+      action: () => navigateAdmin('finance'),
+    });
+  }
+
+  const ALERT_STYLES = {
+    yellow: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
+    orange: 'bg-orange-500/10 border-orange-500/30 text-orange-400',
+    blue:   'bg-blue-500/10 border-blue-500/30 text-blue-400',
+    indigo: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400',
+    red:    'bg-red-500/10 border-red-500/30 text-red-400',
+  };
+
   return (
     <div className="p-6 space-y-6">
+      {/* Alerts */}
+      {alerts.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {alerts.map((a, i) => (
+            <button key={i} onClick={a.action}
+              className={`flex items-center gap-2 border text-sm rounded-lg px-4 py-2 transition-opacity hover:opacity-80 ${ALERT_STYLES[a.type]}`}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              {a.message}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <KpiCard
-          title="CA Total"
+          title="CA Total (livré)"
           value={`${fmt(stats.revenue?.total)} TND`}
           sub={`Ce mois: ${fmt(stats.revenue?.month)} TND`}
           color="bg-emerald-500/20 text-emerald-400"
           icon="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm.31 14.5v1.56h-1.25v-1.5c-1.23-.21-2.22-.86-2.28-2.17h1.23c.07.77.66 1.33 1.88 1.33 1.3 0 1.87-.65 1.87-1.38 0-.68-.4-1.17-1.93-1.51-1.65-.38-2.76-.97-2.76-2.35 0-1.23.96-2.09 2.19-2.27V7h1.25v1.24c1.38.26 2.02 1.16 2.06 2.17H13.3c-.05-.78-.42-1.44-1.7-1.44-1.15 0-1.95.6-1.95 1.38 0 .63.42 1.06 1.87 1.4 1.46.35 2.8.87 2.8 2.47-.01 1.37-.96 2.16-2.01 2.28z"
         />
         <KpiCard
-          title="Commissions"
+          title="Commissions (10%)"
           value={`${fmt(stats.commissions)} TND`}
           color="bg-blue-500/20 text-blue-400"
           icon="M9 14l6-6M9 8h.01M15 14h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
@@ -212,7 +272,7 @@ export default function AdminDashboard() {
           icon="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8z"
         />
         <KpiCard
-          title="En modération"
+          title="En attente"
           value={stats.orders?.pending || 0}
           color="bg-red-500/20 text-red-400"
           icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
@@ -221,7 +281,6 @@ export default function AdminDashboard() {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Line chart - sales 30 days */}
         <div className="xl:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-slate-200 font-semibold text-sm">Ventes — 30 derniers jours</h3>
@@ -230,7 +289,6 @@ export default function AdminDashboard() {
           <LineChart data={stats.salesByDay || []} />
         </div>
 
-        {/* Bar chart - top categories */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <h3 className="text-slate-200 font-semibold text-sm mb-4">Top catégories</h3>
           <BarChart data={stats.topCategories || []} />
@@ -286,27 +344,17 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Alerts */}
-      {(stats.orders?.pending > 0 || stats.vendors?.pending > 0) && (
+      {/* Order Status breakdown */}
+      {stats.orders?.byStatus && Object.keys(stats.orders.byStatus).length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <h3 className="text-slate-200 font-semibold text-sm mb-3">Alertes</h3>
+          <h3 className="text-slate-200 font-semibold text-sm mb-4">Commandes par statut</h3>
           <div className="flex flex-wrap gap-3">
-            {stats.orders?.pending > 0 && (
-              <div className="flex items-center gap-2 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm rounded-lg px-4 py-2">
-                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                {stats.orders.pending} commandes en attente
+            {Object.entries(stats.orders.byStatus).map(([st, count]) => (
+              <div key={st} className={`px-4 py-2 rounded-lg border text-sm font-medium ${STATUS_COLORS[st] ? STATUS_COLORS[st].replace('bg-', 'bg-').replace('/20', '/10') : 'bg-slate-800 text-slate-400'}`}>
+                <span className="font-bold text-lg mr-2">{count}</span>
+                <span className="opacity-80">{st}</span>
               </div>
-            )}
-            {stats.vendors?.pending > 0 && (
-              <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 text-sm rounded-lg px-4 py-2">
-                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8z" />
-                </svg>
-                {stats.vendors.pending} vendeurs en attente d'approbation
-              </div>
-            )}
+            ))}
           </div>
         </div>
       )}

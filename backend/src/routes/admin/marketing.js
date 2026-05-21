@@ -1,9 +1,11 @@
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
-const { logAction } = require('../../middleware/adminAuth');
+const { adminAuth, requireRole, logAction } = require('../../middleware/adminAuth');
 const prisma = new PrismaClient();
 
-// PROMO CODES
+router.use(adminAuth);
+
+// PROMO CODES - GET (all roles)
 router.get('/promo-codes', async (req, res) => {
   try {
     const promos = await prisma.promoCode.findMany({ orderBy: { id: 'desc' } });
@@ -11,16 +13,18 @@ router.get('/promo-codes', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/promo-codes', async (req, res) => {
+router.post('/promo-codes', requireRole('MARKETING'), async (req, res) => {
   try {
     const { code, discount, isActive } = req.body;
-    const promo = await prisma.promoCode.create({ data: { code: code.toUpperCase(), discount: parseFloat(discount), isActive: isActive !== false } });
+    const promo = await prisma.promoCode.create({
+      data: { code: code.toUpperCase(), discount: parseFloat(discount), isActive: isActive !== false }
+    });
     await logAction(req.admin.id, 'CREATE_PROMO', 'marketing', promo.id, { code }, req.ip);
     res.json(promo);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/promo-codes/:id', async (req, res) => {
+router.patch('/promo-codes/:id', requireRole('MARKETING'), async (req, res) => {
   try {
     const { code, discount, isActive } = req.body;
     const data = {};
@@ -32,22 +36,35 @@ router.patch('/promo-codes/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.delete('/promo-codes/:id', async (req, res) => {
+router.delete('/promo-codes/:id', requireRole('MARKETING'), async (req, res) => {
   try {
     await prisma.promoCode.delete({ where: { id: parseInt(req.params.id) } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/promo-codes/:id/toggle', async (req, res) => {
+router.patch('/promo-codes/:id/toggle', requireRole('MARKETING'), async (req, res) => {
   try {
     const promo = await prisma.promoCode.findUnique({ where: { id: parseInt(req.params.id) } });
-    const updated = await prisma.promoCode.update({ where: { id: parseInt(req.params.id) }, data: { isActive: !promo.isActive } });
+    const updated = await prisma.promoCode.update({
+      where: { id: parseInt(req.params.id) }, data: { isActive: !promo.isActive }
+    });
     res.json(updated);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// BANNERS
+// For backward compat - POST toggle (old route)
+router.post('/promo-codes/:id/toggle', requireRole('MARKETING'), async (req, res) => {
+  try {
+    const promo = await prisma.promoCode.findUnique({ where: { id: parseInt(req.params.id) } });
+    const updated = await prisma.promoCode.update({
+      where: { id: parseInt(req.params.id) }, data: { isActive: !promo.isActive }
+    });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// BANNERS - GET (all roles)
 router.get('/banners', async (req, res) => {
   try {
     const banners = await prisma.banner.findMany({ orderBy: { sortOrder: 'asc' } });
@@ -55,17 +72,18 @@ router.get('/banners', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/banners', async (req, res) => {
+router.post('/banners', requireRole('MARKETING'), async (req, res) => {
   try {
     const { title, imageUrl, linkUrl, position, isActive, sortOrder } = req.body;
     const banner = await prisma.banner.create({
-      data: { title, imageUrl, linkUrl, position: position || 'HOME_HERO', isActive: isActive !== false, sortOrder: sortOrder || 0 }
+      data: { title, imageUrl, linkUrl, position: position || 'HOME_HERO', isActive: isActive !== false, sortOrder: parseInt(sortOrder) || 0 }
     });
+    await logAction(req.admin.id, 'CREATE_BANNER', 'marketing', banner.id, { title }, req.ip);
     res.json(banner);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/banners/:id', async (req, res) => {
+router.patch('/banners/:id', requireRole('MARKETING'), async (req, res) => {
   try {
     const { title, imageUrl, linkUrl, position, isActive, sortOrder } = req.body;
     const data = {};
@@ -80,14 +98,24 @@ router.patch('/banners/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.delete('/banners/:id', async (req, res) => {
+router.delete('/banners/:id', requireRole('MARKETING'), async (req, res) => {
   try {
     await prisma.banner.delete({ where: { id: parseInt(req.params.id) } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// FLASH SALES
+router.patch('/banners/:id/toggle', requireRole('MARKETING'), async (req, res) => {
+  try {
+    const banner = await prisma.banner.findUnique({ where: { id: parseInt(req.params.id) } });
+    const updated = await prisma.banner.update({
+      where: { id: parseInt(req.params.id) }, data: { isActive: !banner.isActive }
+    });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// FLASH SALES - GET (all roles)
 router.get('/flash-sales', async (req, res) => {
   try {
     const sales = await prisma.flashSale.findMany({ orderBy: { createdAt: 'desc' } });
@@ -95,7 +123,7 @@ router.get('/flash-sales', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/flash-sales', async (req, res) => {
+router.post('/flash-sales', requireRole('MARKETING'), async (req, res) => {
   try {
     const { name, startAt, endAt, discountPct, isActive, productIds } = req.body;
     const sale = await prisma.flashSale.create({
@@ -105,11 +133,12 @@ router.post('/flash-sales', async (req, res) => {
         productIds: JSON.stringify(productIds || [])
       }
     });
+    await logAction(req.admin.id, 'CREATE_FLASH_SALE', 'marketing', sale.id, { name }, req.ip);
     res.json(sale);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/flash-sales/:id', async (req, res) => {
+router.patch('/flash-sales/:id', requireRole('MARKETING'), async (req, res) => {
   try {
     const { name, startAt, endAt, discountPct, isActive, productIds } = req.body;
     const data = {};
@@ -124,7 +153,7 @@ router.patch('/flash-sales/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.delete('/flash-sales/:id', async (req, res) => {
+router.delete('/flash-sales/:id', requireRole('MARKETING'), async (req, res) => {
   try {
     await prisma.flashSale.delete({ where: { id: parseInt(req.params.id) } });
     res.json({ success: true });
