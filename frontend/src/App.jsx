@@ -1,4 +1,5 @@
 import AdminApp from './admin/AdminApp';
+import SellerApp from './seller/SellerApp';
 import { AppProvider, useApp } from './context/AppContext';
 import { TopBar, Header, CategoryBar, Footer, Toasts, LoginModal } from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -41,9 +42,8 @@ const AppInner = () => (
 );
 
 export default function App() {
-  if (window.location.pathname.startsWith('/admin')) {
-    return <AdminApp />;
-  }
+  if (window.location.pathname.startsWith('/admin')) return <AdminApp />;
+  if (window.location.pathname.startsWith('/seller')) return <SellerApp />;
   return (
     <AppProvider>
       <AppInner />

@@ -33,6 +33,26 @@ async function main() {
   const selMap = Object.fromEntries(sellers.map(s=>[s.slug,s.id]));
   console.log('✅ Sellers created');
 
+  // Seller credentials (email/password pour chaque vendeur)
+  const sellerCredentials = [
+    { slug:'techhub',          email:'techhub@mrplace.tn',       password:'Seller@2024!' },
+    { slug:'fashion-empire',   email:'fashion@mrplace.tn',        password:'Seller@2024!' },
+    { slug:'maison-essentiels',email:'maison@mrplace.tn',         password:'Seller@2024!' },
+    { slug:'beauty-paradise',  email:'beauty@mrplace.tn',         password:'Seller@2024!' },
+    { slug:'sports-arena',     email:'sports@mrplace.tn',         password:'Seller@2024!' },
+    { slug:'monde-enfants',    email:'enfants@mrplace.tn',        password:'Seller@2024!' },
+    { slug:'gourmet-marche',   email:'gourmet@mrplace.tn',        password:'Seller@2024!' },
+    { slug:'auto-pro',         email:'auto@mrplace.tn',           password:'Seller@2024!' },
+  ];
+  for (const sc of sellerCredentials) {
+    const hashed = await bcrypt.hash(sc.password, 10);
+    await prisma.seller.update({
+      where: { slug: sc.slug },
+      data: { email: sc.email, password: hashed, description: `Boutique officielle ${sc.slug}`, isActive: true },
+    });
+  }
+  console.log('✅ Seller credentials created');
+
   // Admin user
   await prisma.user.upsert({
     where: { email: 'admin@mrplace.tn' },
