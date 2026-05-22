@@ -3,7 +3,6 @@ const { PrismaClient } = require('@prisma/client');
 const { adminAuth, requireRole, logAction } = require('../../middleware/adminAuth');
 const prisma = new PrismaClient();
 
-router.use(adminAuth);
 
 // PROMO CODES - GET (all roles)
 router.get('/promo-codes', async (req, res) => {

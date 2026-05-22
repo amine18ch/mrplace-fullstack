@@ -3,8 +3,6 @@ const { PrismaClient } = require('@prisma/client');
 const { adminAuth, requireRole, logAction } = require('../../middleware/adminAuth');
 const prisma = new PrismaClient();
 
-router.use(adminAuth);
-
 // GET /api/admin/products/stats
 router.get('/stats', async (req, res) => {
   try {

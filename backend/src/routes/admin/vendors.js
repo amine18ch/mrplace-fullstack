@@ -3,9 +3,6 @@ const { PrismaClient } = require('@prisma/client');
 const { adminAuth, requireRole, logAction } = require('../../middleware/adminAuth');
 const prisma = new PrismaClient();
 
-// All vendor routes require auth
-router.use(adminAuth);
-
 // GET /api/admin/vendors/applications
 router.get('/applications', requireRole('MODERATEUR', 'COMPTABLE'), async (req, res) => {
   try {
@@ -54,6 +51,31 @@ router.delete('/commissions/:id', requireRole('COMPTABLE'), async (req, res) => 
   try {
     await prisma.commission.delete({ where: { id: parseInt(req.params.id) } });
     res.json({ success: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// POST /api/admin/vendors - créer un nouveau vendeur
+router.post('/', requireRole('MODERATEUR'), async (req, res) => {
+  try {
+    const { name, slug, logo, color, location, joinedYear, responseTime, badge } = req.body;
+    if (!name || !slug) return res.status(400).json({ error: 'Nom et slug requis' });
+    const existing = await prisma.seller.findUnique({ where: { slug } });
+    if (existing) return res.status(400).json({ error: 'Ce slug existe déjà' });
+    const seller = await prisma.seller.create({
+      data: {
+        name, slug: slug.toLowerCase().replace(/\s+/g, '-'),
+        logo: logo || '🏪', color: color || '#2563EB',
+        location: location || 'Tunisie',
+        joinedYear: parseInt(joinedYear) || new Date().getFullYear(),
+        responseTime: responseTime || 'sous 24 heures',
+        badge: badge || 'Nouveau',
+        verified: false,
+      }
+    });
+    // Créer l'application vendeur
+    await prisma.vendorApplication.create({ data: { sellerId: seller.id, status: 'PENDING' } });
+    await logAction(req.admin.id, 'CREATE', 'vendors', seller.id, { name: seller.name }, req.ip);
+    res.json(seller);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

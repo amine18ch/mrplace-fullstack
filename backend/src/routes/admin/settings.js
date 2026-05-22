@@ -4,8 +4,6 @@ const { PrismaClient } = require('@prisma/client');
 const { adminAuth, requireRole, logAction } = require('../../middleware/adminAuth');
 const prisma = new PrismaClient();
 
-router.use(adminAuth);
-
 // GET /api/admin/settings/platform (all roles can read)
 router.get('/platform', async (req, res) => {
   try {

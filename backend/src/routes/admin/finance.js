@@ -3,7 +3,6 @@ const { PrismaClient } = require('@prisma/client');
 const { adminAuth, requireRole, logAction } = require('../../middleware/adminAuth');
 const prisma = new PrismaClient();
 
-router.use(adminAuth);
 router.use(requireRole('COMPTABLE'));
 
 // GET /api/admin/finance/overview
