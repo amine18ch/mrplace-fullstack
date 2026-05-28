@@ -6,7 +6,7 @@ const EMOJIS = ['🏪','💻','👗','🏠','💄','⚽','🧸','🛒','🚗','�
 const COLORS = ['#2563EB','#7C3AED','#DB2777','#DC2626','#D97706','#059669','#0891B2','#0F172A','#6B7280','#1E293B'];
 const inputCls = "w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder:text-slate-600";
 
-export default function SellerStore() {
+export default function SellerStore({ initialTab = 'profil' }) {
   const { seller, setSeller } = useSeller();
   const [form, setForm]         = useState({});
   const [loading, setLoading]   = useState(false);
@@ -14,7 +14,7 @@ export default function SellerStore() {
   const [error, setError]       = useState('');
   const [reviews, setReviews]   = useState([]);
   const [finance, setFinance]   = useState(null);
-  const [tab, setTab]           = useState('profil');
+  const [tab, setTab]           = useState(initialTab);
   const [pwdForm, setPwdForm]   = useState({ current:'', newPassword:'', confirm:'' });
 
   useEffect(() => {

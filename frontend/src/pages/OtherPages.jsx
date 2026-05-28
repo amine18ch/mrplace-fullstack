@@ -79,17 +79,25 @@ export const SellerPage = ({ slug }) => {
   if (loading) return <div className="flex justify-center py-24"><Spinner size={40} /></div>;
   if (!seller) return <div className="p-12 text-center">Vendeur introuvable</div>;
 
+  const bannerBg = seller.bannerColor || seller.color || '#1E3A8A';
+  const isDark = (hex) => {
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return (r*299 + g*587 + b*114) / 1000 < 128;
+  };
+  const textClass = isDark(bannerBg) ? 'text-white' : 'text-slate-900';
+
   return (
     <div>
-      <div className="bg-gradient-to-r from-[#1E3A8A] to-[#2563EB] text-white py-12">
-        <div className="max-w-[1400px] mx-auto px-4 flex items-center gap-6">
-          <div className="w-28 h-28 rounded-full flex items-center justify-center text-6xl shadow-2xl bg-white text-5xl">
+      <div className="py-12" style={{ background: `linear-gradient(135deg, ${bannerBg}, ${seller.color || bannerBg})` }}>
+        <div className={`max-w-[1400px] mx-auto px-4 flex items-center gap-6 ${textClass}`}>
+          <div className="w-28 h-28 rounded-full flex items-center justify-center text-6xl shadow-2xl border-4 border-white/30"
+            style={{ background: seller.color || '#2563EB' }}>
             {seller.logo}
           </div>
           <div className="flex-1">
-            <h1 className="text-4xl font-extrabold flex items-center gap-3 text-shadow">{seller.name}
+            <h1 className="text-4xl font-extrabold flex items-center gap-3">{seller.name}
               {seller.verified && (
-                <span className="bg-blue-300 text-blue-900 text-sm font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                <span className="bg-white/20 backdrop-blur text-sm font-bold px-3 py-1 rounded-full flex items-center gap-1">
                   <Icon name="check" size={14} />Vérifié
                 </span>
               )}
@@ -103,8 +111,9 @@ export const SellerPage = ({ slug }) => {
               <span>Répond {seller.responseTime}</span>
             </div>
             <div className="text-sm opacity-80 mt-1">📍 {seller.location} · Membre depuis {seller.joinedYear}</div>
+            {seller.description && <p className="text-sm opacity-70 mt-1 max-w-xl">{seller.description}</p>}
           </div>
-          <button className="px-6 py-3 rounded-full bg-blue-600 text-white font-bold hover:bg-blue-700">
+          <button className="px-6 py-3 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur font-bold transition-colors">
             Suivre
           </button>
         </div>
