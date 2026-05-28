@@ -57,6 +57,16 @@ router.post('/', auth, async (req, res) => {
     // Vider panier
     await prisma.cartItem.deleteMany({ where: { userId: req.user.id } });
 
+    // Create initial order event
+    await prisma.orderEvent.create({
+      data: { orderId: order.id, status: 'EN_ATTENTE', note: 'Commande passée', createdBy: 'CLIENT' },
+    });
+
+    // Award loyalty points (1 point per DT spent)
+    await prisma.loyaltyPoint.create({
+      data: { userId: req.user.id, points: Math.floor(subtotal), type: 'EARNED', orderId: order.id, note: 'Achat' },
+    });
+
     res.json(order);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -67,20 +77,28 @@ router.post('/', auth, async (req, res) => {
 router.get('/', auth, async (req, res) => {
   const orders = await prisma.order.findMany({
     where: { userId: req.user.id },
-    include: { items: { include: { product: { select: { title:true, images:true, brand:true } } } } },
+    include: {
+      items: { include: { product: { select: { title:true, images:true, brand:true, seller: { select: { name:true, slug:true } } } } } },
+      events: { orderBy: { createdAt: 'asc' } },
+      returnRequest: true,
+    },
     orderBy: { createdAt: 'desc' },
   });
-  res.json(orders);
+  res.json(orders.map(o => ({ ...o, shippingAddress: (() => { try { return JSON.parse(o.shippingAddress); } catch { return {}; } })() })));
 });
 
 // GET /api/orders/:id
 router.get('/:id', auth, async (req, res) => {
   const order = await prisma.order.findFirst({
     where: { id: parseInt(req.params.id), userId: req.user.id },
-    include: { items: { include: { product: { include: { seller: true } } } } },
+    include: {
+      items: { include: { product: { include: { seller: true } } } },
+      events: { orderBy: { createdAt: 'asc' } },
+      returnRequest: true,
+    },
   });
   if (!order) return res.status(404).json({ error: 'Commande introuvable' });
-  res.json(order);
+  res.json({ ...order, shippingAddress: (() => { try { return JSON.parse(order.shippingAddress); } catch { return {}; } })() });
 });
 
 // PATCH /api/orders/:id/status — admin only

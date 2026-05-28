@@ -65,11 +65,27 @@ model Seller {
 }
 
 model Category {
-  id       Int       @id @default(autoincrement())
-  name     String
-  slug     String    @unique
-  icon     String
-  products Product[]
+  id         Int                 @id @default(autoincrement())
+  name       String
+  slug       String              @unique
+  icon       String
+  parentId   Int?
+  parent     Category?           @relation("CategoryTree", fields:[parentId], references:[id])
+  children   Category[]          @relation("CategoryTree")
+  products   Product[]
+  attributes CategoryAttribute[]
+}
+
+model CategoryAttribute {
+  id         Int      @id @default(autoincrement())
+  category   Category @relation(fields:[categoryId], references:[id])
+  categoryId Int
+  name       String
+  slug       String
+  type       String   @default("TEXT")
+  options    String   @default("[]")
+  isRequired Boolean  @default(false)
+  sortOrder  Int      @default(0)
 }
 
 model Product {
@@ -132,22 +148,98 @@ model Wishlist {
 }
 
 model Order {
-  id              Int         @id @default(autoincrement())
-  user            User        @relation(fields:[userId], references:[id])
+  id              Int              @id @default(autoincrement())
+  user            User             @relation(fields:[userId], references:[id])
   userId          Int
-  status          String      @default("EN_ATTENTE")
+  status          String           @default("EN_ATTENTE")
   total           Float
   subtotal        Float
-  discount        Float       @default(0)
-  shippingCost    Float       @default(0)
-  vat             Float       @default(0)
+  discount        Float            @default(0)
+  shippingCost    Float            @default(0)
+  vat             Float            @default(0)
   promoCode       String?
   shippingAddress String
   paymentMethod   String
+  trackingNumber  String?
+  escrowStatus    String           @default("HELD")
+  releasedAt      DateTime?
   items           OrderItem[]
   dispute         Dispute?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  events          OrderEvent[]
+  returnRequest   ReturnRequest?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model OrderEvent {
+  id        Int      @id @default(autoincrement())
+  order     Order    @relation(fields:[orderId], references:[id])
+  orderId   Int
+  status    String
+  note      String   @default("")
+  createdBy String   @default("SYSTEM")
+  createdAt DateTime @default(now())
+}
+
+model ReturnRequest {
+  id          Int      @id @default(autoincrement())
+  order       Order    @relation(fields:[orderId], references:[id])
+  orderId     Int      @unique
+  userId      Int
+  sellerId    Int
+  reason      String
+  description String   @default("")
+  status      String   @default("PENDING")
+  resolution  String?
+  resolvedBy  Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Conversation {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  sellerId  Int
+  productId Int?
+  subject   String    @default("")
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, sellerId])
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  conversation   Conversation @relation(fields:[conversationId], references:[id])
+  conversationId Int
+  senderId       Int
+  senderType     String
+  content        String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+}
+
+model LoyaltyPoint {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  points    Int
+  type      String
+  orderId   Int?
+  note      String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  sellerId  Int?
+  type      String
+  title     String
+  message   String
+  link      String   @default("")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 model OrderItem {

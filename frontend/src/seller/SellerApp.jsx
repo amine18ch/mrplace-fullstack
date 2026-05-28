@@ -6,6 +6,8 @@ import SellerProducts from './pages/SellerProducts';
 import SellerOrders from './pages/SellerOrders';
 import SellerStore from './pages/SellerStore';
 import SellerReviews from './pages/SellerReviews';
+import SellerMessages from './pages/SellerMessages';
+import SellerReturns from './pages/SellerReturns';
 
 const SellerRouter = () => {
   const { seller, page } = useSeller();
@@ -16,6 +18,8 @@ const SellerRouter = () => {
       case 'dashboard': return <SellerDashboard />;
       case 'products':  return <SellerProducts />;
       case 'orders':    return <SellerOrders />;
+      case 'messages':  return <SellerMessages />;
+      case 'returns':   return <SellerReturns />;
       case 'store':
       case 'settings':  return <SellerStore />;
       case 'reviews':   return <SellerReviews />;

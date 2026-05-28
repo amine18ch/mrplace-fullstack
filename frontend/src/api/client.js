@@ -84,3 +84,28 @@ export const categoriesApi = {
 export const promoApi = {
   validate: (code) => api.post('/promo/validate', { code }, false),
 };
+
+// Returns
+export const returnsApi = {
+  create:  (data) => api.post('/returns', data),
+  list:    ()     => api.get('/returns'),
+};
+
+// Messages
+export const messagesApi = {
+  list:         ()              => api.get('/messages'),
+  startConv:    (sellerId, body) => api.post(`/messages/seller/${sellerId}`, body),
+  getConv:      (convId)        => api.get(`/messages/${convId}`),
+  send:         (convId, content) => api.post(`/messages/${convId}/send`, { content }),
+};
+
+// Notifications
+export const notificationsApi = {
+  list:    ()   => api.get('/notifications'),
+  readAll: ()   => api.patch('/notifications/read-all', {}),
+};
+
+// Loyalty
+export const loyaltyApi = {
+  get: () => api.get('/loyalty'),
+};

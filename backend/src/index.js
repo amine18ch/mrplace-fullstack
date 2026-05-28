@@ -21,6 +21,10 @@ app.use('/api/orders',     require('./routes/orders'));
 app.use('/api/sellers',    require('./routes/sellers'));
 app.use('/api/categories', require('./routes/categories'));
 app.use('/api/promo',      require('./routes/promo'));
+app.use('/api/messages',   require('./routes/messages'));
+app.use('/api/returns',    require('./routes/returns'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/loyalty',    require('./routes/loyalty'));
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -33,6 +37,9 @@ app.use('/api/seller/dashboard', require('./routes/seller/dashboard'));
 app.use('/api/seller/products',  require('./routes/seller/products'));
 app.use('/api/seller/orders',    require('./routes/seller/orders'));
 app.use('/api/seller/store',     require('./routes/seller/store'));
+app.use('/api/seller/returns',   require('./routes/seller/returns'));
+app.use('/api/seller/notifications', require('./routes/seller/notifications'));
+app.use('/api/seller/register',  require('./routes/seller/register'));
 
 // Admin routes
 const { adminAuth } = require('./middleware/adminAuth');
@@ -44,7 +51,9 @@ app.use('/api/admin/orders',    adminAuth, require('./routes/admin/orders'));
 app.use('/api/admin/customers', adminAuth, require('./routes/admin/customers'));
 app.use('/api/admin/finance',   adminAuth, require('./routes/admin/finance'));
 app.use('/api/admin/marketing', adminAuth, require('./routes/admin/marketing'));
-app.use('/api/admin/settings',  adminAuth, require('./routes/admin/settings'));
+app.use('/api/admin/settings',   adminAuth, require('./routes/admin/settings'));
+app.use('/api/admin/attributes', adminAuth, require('./routes/admin/attributes'));
+app.use('/api/admin/returns',    adminAuth, require('./routes/admin/returns'));
 
 // Serve frontend static files if dist exists
 if (fs.existsSync(FRONTEND_DIST)) {

@@ -22,6 +22,7 @@ export default function SellerOrders() {
   const [statusFilter, setStatusFilter] = useState('');
   const [selected, setSelected] = useState(null);
   const [newStatus, setNewStatus] = useState('');
+  const [trackingNum, setTracking] = useState('');
   const [actionLoading, setActLoad] = useState(false);
   const [error, setError]     = useState('');
   const [success, setSuccess] = useState('');
@@ -42,9 +43,9 @@ export default function SellerOrders() {
     if (!newStatus || !selected) return;
     setActLoad(true);
     try {
-      await sellerApi.patch(`/orders/${selected.id}/status`, { status: newStatus });
+      await sellerApi.patch(`/orders/${selected.id}/status`, { status: newStatus, trackingNumber: trackingNum || undefined });
       setSuccess('Statut mis à jour ✓');
-      setSelected(null); setNewStatus('');
+      setSelected(null); setNewStatus(''); setTracking('');
       load();
       setTimeout(() => setSuccess(''), 3000);
     } catch (e) { setError(e.message); }
@@ -184,7 +185,7 @@ export default function SellerOrders() {
               </div>
 
               {/* Changer statut */}
-              {['CONFIRMEE', 'EN_ATTENTE'].includes(selected.status) && (
+              {['CONFIRMEE', 'EN_ATTENTE', 'EN_PREPARATION'].includes(selected.status) && (
                 <div className="bg-slate-900 rounded-xl p-4">
                   <div className="text-slate-400 text-xs font-semibold mb-3">METTRE À JOUR LE STATUT</div>
                   <div className="grid grid-cols-2 gap-2 mb-3">
@@ -195,11 +196,16 @@ export default function SellerOrders() {
                       </button>
                     ))}
                   </div>
+                  {newStatus === 'EXPEDIEE' && (
+                    <input value={trackingNum} onChange={e => setTracking(e.target.value)}
+                      placeholder="Numéro de suivi (optionnel)"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 mb-3"
+                    />
+                  )}
                   <button onClick={handleStatusUpdate} disabled={!newStatus || newStatus===selected.status || actionLoading}
                     className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
                     {actionLoading ? 'Mise à jour...' : 'Confirmer le statut'}
                   </button>
-                  <p className="text-slate-600 text-xs mt-2 text-center">Vous pouvez marquer EN PRÉPARATION ou EXPÉDIÉE</p>
                 </div>
               )}
             </div>

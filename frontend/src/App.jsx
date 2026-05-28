@@ -7,7 +7,7 @@ import CategoryPage from './pages/CategoryPage';
 import ProductPage from './pages/ProductPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
-import { WishlistPage, SellerPage, SearchPage, AccountPage, OrdersPage } from './pages/OtherPages';
+import { WishlistPage, SellerPage, SearchPage, AccountPage, OrdersPage, MessagesPage } from './pages/OtherPages';
 
 
 const Router = () => {
@@ -23,6 +23,7 @@ const Router = () => {
     case 'search':   return <SearchPage query={pageParams.query} />;
     case 'account':  return <AccountPage />;
     case 'orders':   return <OrdersPage />;
+    case 'messages': return <MessagesPage />;
     default:         return <HomePage />;
   }
 };

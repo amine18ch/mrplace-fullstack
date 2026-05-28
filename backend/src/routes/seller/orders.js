@@ -71,10 +71,10 @@ router.get('/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PATCH /api/seller/orders/:id/status — vendeur peut marquer EN_PREPARATION ou EXPEDIEE
+// PATCH /api/seller/orders/:id/status
 router.patch('/:id/status', async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, trackingNumber, note } = req.body;
     const ALLOWED = ['EN_PREPARATION', 'EXPEDIEE'];
     if (!ALLOWED.includes(status)) return res.status(400).json({ error: `Statut autorisé: ${ALLOWED.join(', ')}` });
 
@@ -83,7 +83,17 @@ router.patch('/:id/status', async (req, res) => {
     });
     if (!order) return res.status(404).json({ error: 'Commande introuvable' });
 
-    const updated = await prisma.order.update({ where: { id: order.id }, data: { status } });
+    const data = { status };
+    if (trackingNumber) data.trackingNumber = trackingNumber;
+
+    const updated = await prisma.order.update({ where: { id: order.id }, data });
+    await prisma.orderEvent.create({
+      data: { orderId: order.id, status, note: note || '', createdBy: `SELLER:${req.seller.id}` },
+    });
+    // Notify client
+    await prisma.notification.create({
+      data: { userId: order.userId, type: 'ORDER_UPDATE', title: 'Commande mise à jour', message: `Votre commande #${String(order.id).padStart(4,'0')} est maintenant "${status}"`, link: '/orders' },
+    });
     res.json(updated);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

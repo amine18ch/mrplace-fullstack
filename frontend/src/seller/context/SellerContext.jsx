@@ -13,7 +13,7 @@ export const SellerProvider = ({ children }) => {
   const [loading, setLoading]     = useState(true);
   const [page, setPage]           = useState('dashboard');
   const [pageParams, setPageParams] = useState({});
-  const [notifications, setNotifs]  = useState({ pendingProducts: 0, pendingOrders: 0 });
+  const [notifications, setNotifs]  = useState({ pendingProducts: 0, pendingOrders: 0, unreadMessages: 0, pendingReturns: 0 });
 
   useEffect(() => {
     if (getSellerToken()) {
@@ -28,6 +28,14 @@ export const SellerProvider = ({ children }) => {
     }).catch(() => {});
     sellerApi.get('/products?status=inactive&limit=1').then(d => {
       setNotifs(n => ({ ...n, pendingProducts: d.total || 0 }));
+    }).catch(() => {});
+    sellerApi.get('/messages/seller/list').then(convs => {
+      const unread = convs.reduce((s, c) => s + (c.unread || 0), 0);
+      setNotifs(n => ({ ...n, unreadMessages: unread }));
+    }).catch(() => {});
+    sellerApi.get('/returns').then(returns => {
+      const pending = returns.filter(r => r.status === 'PENDING').length;
+      setNotifs(n => ({ ...n, pendingReturns: pending }));
     }).catch(() => {});
   }, [seller]);
 

@@ -334,7 +334,7 @@ const ProductPage = ({ id }) => {
           )}
           {tab === 'shipping' && (
             <div className="space-y-3">
-              <p><b>Livraison:</b> Express sous 24h sur les commandes > 200 DT. Standard 1-3 jours ouvrables.</p>
+              <p><b>Livraison:</b> Express sous 24h sur les commandes &gt; 200 DT. Standard 1-3 jours ouvrables.</p>
               <p><b>Retours:</b> {product.returnPolicy} à compter de la réception. Produit en état d'origine requis.</p>
               <p><b>Paiement:</b> Carte bancaire, D17, CIB, Virement, Paiement à la livraison (COD).</p>
               <p><b>Garantie:</b> {product.warranty} fabricant. Échange immédiat si produit défectueux.</p>
