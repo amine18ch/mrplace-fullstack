@@ -29,7 +29,7 @@ export const SellerProvider = ({ children }) => {
     sellerApi.get('/products?status=inactive&limit=1').then(d => {
       setNotifs(n => ({ ...n, pendingProducts: d.total || 0 }));
     }).catch(() => {});
-    sellerApi.get('/messages/seller/list').then(convs => {
+    sellerApi.get('/messages').then(convs => {
       const unread = convs.reduce((s, c) => s + (c.unread || 0), 0);
       setNotifs(n => ({ ...n, unreadMessages: unread }));
     }).catch(() => {});

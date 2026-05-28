@@ -13,7 +13,7 @@ export default function SellerMessages() {
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    sellerApi.get('/messages/seller/list')
+    sellerApi.get('/messages')
       .then(setConvs)
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -22,9 +22,8 @@ export default function SellerMessages() {
   const openConv = async (conv) => {
     setActive(conv);
     try {
-      const d = await sellerApi.get(`/messages/seller/conv/${conv.id}`);
+      const d = await sellerApi.get(`/messages/${conv.id}`);
       setMessages(d.messages || []);
-      // Mark unread → 0
       setConvs(cs => cs.map(c => c.id === conv.id ? { ...c, unread: 0 } : c));
     } catch {}
   };
@@ -37,7 +36,7 @@ export default function SellerMessages() {
     if (!text.trim() || !active || sending) return;
     setSending(true);
     try {
-      const msg = await sellerApi.post(`/messages/seller/conv/${active.id}/send`, { content: text.trim() });
+      const msg = await sellerApi.post(`/messages/${active.id}/send`, { content: text.trim() });
       setMessages(ms => [...ms, msg]);
       setText('');
     } catch {}

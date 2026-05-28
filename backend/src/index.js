@@ -37,9 +37,10 @@ app.use('/api/seller/dashboard', require('./routes/seller/dashboard'));
 app.use('/api/seller/products',  require('./routes/seller/products'));
 app.use('/api/seller/orders',    require('./routes/seller/orders'));
 app.use('/api/seller/store',     require('./routes/seller/store'));
-app.use('/api/seller/returns',   require('./routes/seller/returns'));
+app.use('/api/seller/returns',      require('./routes/seller/returns'));
+app.use('/api/seller/messages',     require('./routes/seller/messages'));
 app.use('/api/seller/notifications', require('./routes/seller/notifications'));
-app.use('/api/seller/register',  require('./routes/seller/register'));
+app.use('/api/seller/register',     require('./routes/seller/register'));
 
 // Admin routes
 const { adminAuth } = require('./middleware/adminAuth');
