@@ -344,14 +344,19 @@ model Dispute {
 }
 
 model Banner {
-  id        Int      @id @default(autoincrement())
-  title     String
-  imageUrl  String
-  linkUrl   String?
-  position  String   @default("HOME_HERO")
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  title       String
+  subtitle    String   @default("")
+  description String   @default("")
+  ctaText     String   @default("Découvrir")
+  catSlug     String   @default("")
+  bgFrom      String   @default("#1E3A8A")
+  bgTo        String   @default("#2563EB")
+  emoji       String   @default("🎉")
+  imageUrl    String   @default("")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
 }
 
 model FlashSale {

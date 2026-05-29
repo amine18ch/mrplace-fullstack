@@ -71,27 +71,38 @@ router.get('/banners', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/banners', requireRole('MARKETING'), async (req, res) => {
+router.post('/banners', requireRole('MARKETING', 'MODERATEUR'), async (req, res) => {
   try {
-    const { title, imageUrl, linkUrl, position, isActive, sortOrder } = req.body;
+    const { title, subtitle, description, ctaText, catSlug, bgFrom, bgTo, emoji, sortOrder } = req.body;
     const banner = await prisma.banner.create({
-      data: { title, imageUrl, linkUrl, position: position || 'HOME_HERO', isActive: isActive !== false, sortOrder: parseInt(sortOrder) || 0 }
+      data: {
+        title: title || 'Nouveau banner',
+        subtitle: subtitle || '', description: description || '',
+        ctaText: ctaText || 'Découvrir', catSlug: catSlug || '',
+        bgFrom: bgFrom || '#1E3A8A', bgTo: bgTo || '#2563EB',
+        emoji: emoji || '🎉',
+        isActive: true, sortOrder: parseInt(sortOrder) || 0,
+      },
     });
     await logAction(req.admin.id, 'CREATE_BANNER', 'marketing', banner.id, { title }, req.ip);
     res.json(banner);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/banners/:id', requireRole('MARKETING'), async (req, res) => {
+router.patch('/banners/:id', requireRole('MARKETING', 'MODERATEUR'), async (req, res) => {
   try {
-    const { title, imageUrl, linkUrl, position, isActive, sortOrder } = req.body;
+    const { title, subtitle, description, ctaText, catSlug, bgFrom, bgTo, emoji, isActive, sortOrder } = req.body;
     const data = {};
-    if (title !== undefined) data.title = title;
-    if (imageUrl !== undefined) data.imageUrl = imageUrl;
-    if (linkUrl !== undefined) data.linkUrl = linkUrl;
-    if (position !== undefined) data.position = position;
-    if (isActive !== undefined) data.isActive = isActive;
-    if (sortOrder !== undefined) data.sortOrder = parseInt(sortOrder);
+    if (title       !== undefined) data.title       = title;
+    if (subtitle    !== undefined) data.subtitle    = subtitle;
+    if (description !== undefined) data.description = description;
+    if (ctaText     !== undefined) data.ctaText     = ctaText;
+    if (catSlug     !== undefined) data.catSlug     = catSlug;
+    if (bgFrom      !== undefined) data.bgFrom      = bgFrom;
+    if (bgTo        !== undefined) data.bgTo        = bgTo;
+    if (emoji       !== undefined) data.emoji       = emoji;
+    if (isActive    !== undefined) data.isActive    = isActive;
+    if (sortOrder   !== undefined) data.sortOrder   = parseInt(sortOrder);
     const banner = await prisma.banner.update({ where: { id: parseInt(req.params.id) }, data });
     res.json(banner);
   } catch (e) { res.status(500).json({ error: e.message }); }

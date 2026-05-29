@@ -1,26 +1,31 @@
 import { useState, useEffect } from 'react';
-import { productsApi, sellersApi } from '../api/client';
+import { productsApi, sellersApi, api } from '../api/client';
 import { useApp } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
 import { fmt, SkeletonCard } from '../components/ui';
 import Icon from '../components/Icon';
 
-const HERO_SLIDES = [
-  { title:'MEGA PROMO', sub:'Jusqu\'à -70%', desc:'Électronique, Mode & Maison', cta:'Acheter', cat:'electronics', bg:'linear-gradient(135deg,#1E3A8A 0%,#2563EB 100%)', emoji:'🎉' },
-  { title:'Nouveautés Tech', sub:'Derniers gadgets', desc:'iPhone 15, Galaxy S24, MacBook M3', cta:'Découvrir', cat:'electronics', bg:'linear-gradient(135deg,#2563EB 0%,#3B82F6 100%)', emoji:'📱' },
-  { title:'Livraison Express', sub:'Demain avant 22h', desc:'Sur les commandes > 200 DT', cta:'Commencer', cat:null, bg:'linear-gradient(135deg,#3B82F6 0%,#60A5FA 100%)', emoji:'🚚' },
+// Fallback si aucun banner en base
+const FALLBACK_SLIDES = [
+  { id:0, title:'MEGA PROMO', subtitle:'Jusqu\'à -70%', description:'Électronique, Mode & Maison', ctaText:'Acheter', catSlug:'phones', bgFrom:'#1E3A8A', bgTo:'#2563EB', emoji:'🎉' },
 ];
-// Catégories chargées dynamiquement depuis l'API
-
 
 const HeroBanner = () => {
   const { navigate } = useApp();
-  const [slide, setSlide] = useState(0);
-  const [time, setTime] = useState({ h:11, m:32, s:45 });
+  const [slides, setSlides]   = useState(FALLBACK_SLIDES);
+  const [slide, setSlide]     = useState(0);
+  const [time, setTime]       = useState({ h:11, m:32, s:45 });
+
   useEffect(() => {
-    const t = setInterval(() => setSlide(s => (s+1) % HERO_SLIDES.length), 5000);
-    return () => clearInterval(t);
+    api.get('/banners', false).then(data => { if (data?.length) setSlides(data); }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (slides.length < 2) return;
+    const t = setInterval(() => setSlide(s => (s+1) % slides.length), 5000);
+    return () => clearInterval(t);
+  }, [slides.length]);
+
   useEffect(() => {
     const t = setInterval(() => setTime(p => {
       let s=p.s-1,m=p.m,h=p.h;
@@ -29,15 +34,20 @@ const HeroBanner = () => {
     }), 1000);
     return () => clearInterval(t);
   }, []);
-  const s = HERO_SLIDES[slide];
+
+  if (!slides.length) return null;
+  const cur = slides[slide];
+  const bg  = `linear-gradient(135deg, ${cur.bgFrom} 0%, ${cur.bgTo} 100%)`;
+  const n   = slides.length;
+
   return (
-    <div className="relative overflow-hidden rounded-2xl mx-4 mt-4 h-80" style={{ background: s.bg }}>
-      <div className="max-w-[1400px] mx-auto h-full flex items-center justify-between px-12">
-        <div className="text-white max-w-xl anim-fadeIn" key={slide}>
-          <div className="inline-block bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-bold mb-3">{s.title}</div>
-          <h1 className="text-5xl font-extrabold mb-3 text-shadow">{s.sub}</h1>
-          <p className="text-lg opacity-90 mb-4">{s.desc}</p>
-          <div className="flex items-center gap-2 mb-5">
+    <div className="relative overflow-hidden rounded-2xl mx-4 mt-4 h-64 sm:h-80" style={{ background: bg }}>
+      <div className="max-w-[1400px] mx-auto h-full flex items-center justify-between px-6 sm:px-12">
+        <div className="text-white max-w-xl anim-fadeIn" key={cur.id}>
+          <div className="inline-block bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-bold mb-3">{cur.title}</div>
+          <h1 className="text-3xl sm:text-5xl font-extrabold mb-3 text-shadow">{cur.subtitle}</h1>
+          <p className="text-sm sm:text-lg opacity-90 mb-4">{cur.description}</p>
+          <div className="hidden sm:flex items-center gap-2 mb-5">
             {[time.h, time.m, time.s].map((v, i) => (
               <span key={i} className="bg-white/15 backdrop-blur rounded-lg px-3 py-2 min-w-[52px] text-center">
                 <div className="text-2xl font-bold">{String(v).padStart(2,'0')}</div>
@@ -45,25 +55,29 @@ const HeroBanner = () => {
               </span>
             ))}
           </div>
-          <button onClick={() => s.cat ? navigate('category',{slug:s.cat}) : navigate('search',{query:''})}
-            className="bg-white text-blue-700 px-7 py-3 rounded-full font-bold hover:bg-blue-50 transition shadow-lg">
-            {s.cta} →
+          <button
+            onClick={() => cur.catSlug ? navigate('category',{slug:cur.catSlug}) : navigate('search',{query:''})}
+            className="bg-white text-blue-700 px-5 sm:px-7 py-2.5 sm:py-3 rounded-full font-bold hover:bg-blue-50 transition shadow-lg text-sm sm:text-base">
+            {cur.ctaText} →
           </button>
         </div>
-        <div className="hidden md:block text-[180px] opacity-90">{s.emoji}</div>
+        <div className="hidden md:block text-[140px] lg:text-[180px] opacity-90 select-none">{cur.emoji}</div>
       </div>
-      <button onClick={() => setSlide((slide-1+3)%3)} className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur w-10 h-10 rounded-full text-white hover:bg-white/30 flex items-center justify-center">
-        <Icon name="chevL" />
-      </button>
-      <button onClick={() => setSlide((slide+1)%3)} className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur w-10 h-10 rounded-full text-white hover:bg-white/30 flex items-center justify-center">
-        <Icon name="chevR" />
-      </button>
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-        {HERO_SLIDES.map((_,k) => (
-          <button key={k} onClick={() => setSlide(k)}
-            className={`h-2 rounded-full transition-all ${k===slide?'w-8 bg-white':'w-2 bg-white/50'}`} />
-        ))}
-      </div>
+
+      {n > 1 && <>
+        <button onClick={() => setSlide((slide-1+n)%n)} className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur w-10 h-10 rounded-full text-white hover:bg-white/30 flex items-center justify-center">
+          <Icon name="chevL" />
+        </button>
+        <button onClick={() => setSlide((slide+1)%n)} className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/20 backdrop-blur w-10 h-10 rounded-full text-white hover:bg-white/30 flex items-center justify-center">
+          <Icon name="chevR" />
+        </button>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+          {slides.map((_,k) => (
+            <button key={k} onClick={() => setSlide(k)}
+              className={`h-2 rounded-full transition-all ${k===slide?'w-8 bg-white':'w-2 bg-white/50'}`} />
+          ))}
+        </div>
+      </>}
     </div>
   );
 };

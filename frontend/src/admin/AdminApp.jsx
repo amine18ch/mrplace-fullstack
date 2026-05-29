@@ -11,6 +11,7 @@ import AdminMarketing from './pages/AdminMarketing';
 import AdminSettings from './pages/AdminSettings';
 import AdminLogs from './pages/AdminLogs';
 import AdminCategories from './pages/AdminCategories';
+import AdminBanners from './pages/AdminBanners';
 
 const AdminRouter = () => {
   const { currentAdminPage, adminPageParams, admin, can } = useAdmin();
@@ -48,6 +49,9 @@ const AdminRouter = () => {
       case 'categories':
         if (admin.role !== 'SUPER_ADMIN' && admin.role !== 'MODERATEUR') return <AccessDenied />;
         return <AdminCategories />;
+      case 'banners':
+        if (!can('marketing.read') && admin.role !== 'SUPER_ADMIN') return <AccessDenied />;
+        return <AdminBanners />;
       case 'logs':
         if (!can('logs.read') && admin.role !== 'SUPER_ADMIN') return <AccessDenied />;
         return <AdminLogs />;
