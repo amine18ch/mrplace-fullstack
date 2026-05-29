@@ -307,20 +307,44 @@ export const CategoryBar = () => {
   const { navigate, categories: cats } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const [hovered, setHovered]   = useState(null);
-  const menuRef = useRef(null);
+  const [canLeft, setCanLeft]   = useState(false);
+  const [canRight, setCanRight] = useState(false);
+  const menuRef   = useRef(null);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
     if (cats.length && !hovered) setHovered(cats[0]);
   }, [cats]);
 
-  const closeMenu = () => { setMenuOpen(false); };
+  // Mettre à jour les flèches selon position de scroll
+  const checkScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 8);
+    setCanRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 8);
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener('scroll', checkScroll, { passive: true });
+    window.addEventListener('resize', checkScroll);
+    return () => { el.removeEventListener('scroll', checkScroll); window.removeEventListener('resize', checkScroll); };
+  }, [cats]);
+
+  const scrollBy = (dir) => {
+    scrollRef.current?.scrollBy({ left: dir * 220, behavior: 'smooth' });
+  };
+
+  const closeMenu = () => setMenuOpen(false);
 
   return (
-    <div className="bg-white border-b border-gray-200 shadow-sm relative z-40">
-      <div className="max-w-[1400px] mx-auto px-4 h-12 flex items-center gap-1" style={{ overflow: 'visible' }}>
+    <div className="bg-white border-b border-gray-200 shadow-sm z-40 relative">
+      <div className="max-w-[1400px] mx-auto flex items-center h-12">
 
-        {/* Bouton "Toutes catégories" */}
-        <div ref={menuRef} className="relative flex-shrink-0">
+        {/* Bouton "Toutes catégories" — fixe à gauche */}
+        <div ref={menuRef} className="relative flex-shrink-0 pl-4 pr-2">
           <button
             onMouseEnter={() => { setMenuOpen(true); if (cats.length && !hovered) setHovered(cats[0]); }}
             onClick={() => setMenuOpen(o => !o)}
@@ -329,14 +353,11 @@ export const CategoryBar = () => {
           </button>
 
           {menuOpen && (
-            <div
-              className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 flex anim-fadeIn"
-              style={{ width: 560 }}
-              onMouseLeave={closeMenu}>
+            <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 flex anim-fadeIn"
+              style={{ width: 560 }} onMouseLeave={closeMenu}>
               <div className="w-52 border-r border-gray-100 py-2 overflow-y-auto" style={{ maxHeight: 420 }}>
                 {cats.map(c => (
-                  <div key={c.id}
-                    onMouseEnter={() => setHovered(c)}
+                  <div key={c.id} onMouseEnter={() => setHovered(c)}
                     onClick={() => { navigate('category', { slug: c.slug }); closeMenu(); }}
                     className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition ${hovered?.id === c.id ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-50 text-slate-700'}`}>
                     <span className="text-xl flex-shrink-0">{c.icon}</span>
@@ -359,8 +380,7 @@ export const CategoryBar = () => {
                     {hovered.children?.length > 0 && (
                       <div className="grid grid-cols-2 gap-1">
                         {hovered.children.map(sub => (
-                          <div key={sub.id}
-                            onClick={() => { navigate('category', { slug: sub.slug }); closeMenu(); }}
+                          <div key={sub.id} onClick={() => { navigate('category', { slug: sub.slug }); closeMenu(); }}
                             className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-blue-50 cursor-pointer transition group">
                             <span className="text-base flex-shrink-0">{sub.icon}</span>
                             <span className="text-xs text-slate-600 group-hover:text-blue-600 leading-tight">{sub.name}</span>
@@ -375,10 +395,40 @@ export const CategoryBar = () => {
           )}
         </div>
 
-        {/* Raccourcis avec dropdowns (desktop seulement — hover ne fonctionne pas sur iOS) */}
-        {cats.map(c => (
-          <CatItem key={c.slug} cat={c} navigate={navigate} />
-        ))}
+        {/* Séparateur vertical */}
+        <div className="w-px h-6 bg-gray-200 flex-shrink-0" />
+
+        {/* Zone scrollable avec flèches */}
+        <div className="flex-1 relative overflow-hidden">
+          {/* Flèche gauche */}
+          {canLeft && (
+            <button onClick={() => scrollBy(-1)}
+              className="absolute left-0 top-0 bottom-0 z-10 px-2 flex items-center bg-gradient-to-r from-white via-white to-transparent">
+              <span className="w-7 h-7 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition text-gray-600">
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M15 18l-6-6 6-6"/></svg>
+              </span>
+            </button>
+          )}
+
+          {/* Liste catégories scrollable */}
+          <div ref={scrollRef}
+            className="flex items-center gap-0.5 overflow-x-auto px-3"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', WebkitOverflowScrolling: 'touch' }}>
+            {cats.map(c => <CatItem key={c.slug} cat={c} navigate={navigate} />)}
+          </div>
+
+          {/* Flèche droite + fondu */}
+          {canRight && (
+            <button onClick={() => scrollBy(1)}
+              className="absolute right-0 top-0 bottom-0 z-10 px-2 flex items-center bg-gradient-to-l from-white via-white to-transparent">
+              <span className="w-7 h-7 flex items-center justify-center rounded-full bg-white border border-gray-200 shadow-sm hover:bg-gray-50 transition text-gray-600">
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M9 18l6-6-6-6"/></svg>
+              </span>
+            </button>
+          )}
+        </div>
+
+        <div className="pr-4" />
       </div>
     </div>
   );
