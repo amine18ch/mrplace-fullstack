@@ -19,7 +19,12 @@ const SearchBar = () => {
   const [cat, setCat] = useState('all');
   const [focused, setFocused] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+  const [cats, setCats] = useState([]);
   const timer = useRef(null);
+
+  useEffect(() => {
+    getCats().then(setCats).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -40,7 +45,7 @@ const SearchBar = () => {
         <select value={cat} onChange={e => setCat(e.target.value)}
           className="bg-gray-50 text-sm font-medium text-slate-700 px-3 py-3 border-r border-gray-200 outline-none cursor-pointer">
           <option value="all">Tout</option>
-          {CATEGORIES.map(c => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+          {cats.map(c => <option key={c.slug} value={c.slug}>{c.icon} {c.name}</option>)}
         </select>
         <input value={q} onChange={e => setQ(e.target.value)}
           onFocus={() => setFocused(true)}

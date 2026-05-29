@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { productsApi, sellersApi } from '../api/client';
+import { productsApi, sellersApi, categoriesApi } from '../api/client';
 import { useApp } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
 import { fmt, SkeletonCard } from '../components/ui';
@@ -10,16 +10,8 @@ const HERO_SLIDES = [
   { title:'Nouveautés Tech', sub:'Derniers gadgets', desc:'iPhone 15, Galaxy S24, MacBook M3', cta:'Découvrir', cat:'electronics', bg:'linear-gradient(135deg,#2563EB 0%,#3B82F6 100%)', emoji:'📱' },
   { title:'Livraison Express', sub:'Demain avant 22h', desc:'Sur les commandes > 200 DT', cta:'Commencer', cat:null, bg:'linear-gradient(135deg,#3B82F6 0%,#60A5FA 100%)', emoji:'🚚' },
 ];
-const CATS = [
-  {slug:'electronics',name:'Électronique',icon:'📱'},
-  {slug:'fashion',name:'Mode',icon:'👕'},
-  {slug:'home',name:'Maison',icon:'🛋️'},
-  {slug:'beauty',name:'Beauté',icon:'💄'},
-  {slug:'sports',name:'Sports',icon:'⚽'},
-  {slug:'toys',name:'Jouets',icon:'🧸'},
-  {slug:'grocery',name:'Épicerie',icon:'🛒'},
-  {slug:'auto',name:'Auto',icon:'🚗'},
-];
+// Catégories chargées dynamiquement depuis l'API
+
 
 const HeroBanner = () => {
   const { navigate } = useApp();
@@ -81,6 +73,7 @@ const HomePage = () => {
   const [flash, setFlash]       = useState([]);
   const [trending, setTrending] = useState([]);
   const [sellers, setSellers]   = useState([]);
+  const [cats, setCats]         = useState([]);
   const [loading, setLoading]   = useState(true);
   const [flashTime, setFlashTime] = useState({ h:5, m:12, s:30 });
 
@@ -95,14 +88,16 @@ const HomePage = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [fp, tp, sp] = await Promise.all([
+      const [fp, tp, sp, cs] = await Promise.all([
         productsApi.list({ sort:'discount', limit:10 }),
         productsApi.list({ sort:'popular', limit:8 }),
         sellersApi.list(),
+        categoriesApi.list(),
       ]);
       setFlash(fp.products);
       setTrending(tp.products);
       setSellers(sp);
+      setCats(cs);
       setLoading(false);
     };
     load().catch(console.error);
@@ -115,8 +110,8 @@ const HomePage = () => {
       {/* Categories */}
       <section className="max-w-[1400px] mx-auto px-4 mt-8">
         <h2 className="text-xl font-bold text-slate-800 mb-4">Acheter par catégorie</h2>
-        <div className="grid grid-cols-4 md:grid-cols-8 gap-3">
-          {CATS.map(c => (
+        <div className="grid grid-cols-4 md:grid-cols-6 xl:grid-cols-11 gap-3">
+          {cats.slice(0, 11).map(c => (
             <div key={c.slug} onClick={() => navigate('category', { slug: c.slug })}
               className="bg-white rounded-2xl p-4 text-center cursor-pointer border border-gray-200 hover-lift hover:border-blue-400 transition">
               <div className="w-14 h-14 mx-auto rounded-full bg-blue-50 flex items-center justify-center text-3xl mb-2">{c.icon}</div>
