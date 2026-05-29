@@ -28,6 +28,137 @@ const Field = ({ label, children, required }) => (
   </div>
 );
 
+// ── ProductForm au niveau module pour éviter la recréation à chaque re-render
+const ProductForm = ({ form, setForm, categories, subcategories, discount, fileInputRef, uploading, handleImageUpload, removeImage, actionLoading, modal, handleCreate, handleEdit, setModal }) => (
+  <div className="space-y-4">
+    <div className="grid grid-cols-2 gap-3">
+      <Field label="Titre du produit" required>
+        <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} className={inputCls} placeholder="Ex: iPhone 15 Pro 256Go" />
+      </Field>
+      <Field label="Marque / Brand">
+        <input value={form.brand} onChange={e=>setForm(f=>({...f,brand:e.target.value}))} className={inputCls} placeholder="Apple, Samsung..." />
+      </Field>
+
+      <Field label="Catégorie" required>
+        <select value={form.categoryId} onChange={e=>setForm(f=>({...f, categoryId:e.target.value, subcategoryId:''}))} className={inputCls}>
+          <option value="">Choisir une catégorie...</option>
+          {categories.filter(c=>!c.parentId).map(c =>
+            <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+          )}
+        </select>
+      </Field>
+
+      <Field label="Sous-catégorie">
+        <select value={form.subcategoryId} onChange={e=>setForm(f=>({...f,subcategoryId:e.target.value}))} className={inputCls} disabled={!subcategories.length}>
+          <option value="">— Toute la catégorie —</option>
+          {subcategories.map(s =>
+            <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
+          )}
+        </select>
+      </Field>
+
+      <Field label="Prix de vente (DT)" required>
+        <input type="number" value={form.price} onChange={e=>setForm(f=>({...f,price:e.target.value}))} min="0" step="0.001" className={inputCls} placeholder="299.000" />
+      </Field>
+      <Field label="Prix original (DT)">
+        <div className="relative">
+          <input type="number" value={form.originalPrice} onChange={e=>setForm(f=>({...f,originalPrice:e.target.value}))} min="0" step="0.001" className={inputCls} placeholder="399.000" />
+          {discount > 0 && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">-{discount}%</span>}
+        </div>
+      </Field>
+
+      <Field label="Stock disponible">
+        <input type="number" value={form.stock} onChange={e=>setForm(f=>({...f,stock:e.target.value}))} min="0" className={inputCls} placeholder="100" />
+      </Field>
+      <Field label="Référence / SKU">
+        <input value={form.sku} onChange={e=>setForm(f=>({...f,sku:e.target.value}))} className={inputCls} placeholder="EX: TH-IP15-256-BLK" />
+      </Field>
+
+      <Field label="Garantie">
+        <input value={form.warranty} onChange={e=>setForm(f=>({...f,warranty:e.target.value}))} className={inputCls} placeholder="1 an" />
+      </Field>
+      <Field label="Politique de retour">
+        <input value={form.returnPolicy} onChange={e=>setForm(f=>({...f,returnPolicy:e.target.value}))} className={inputCls} placeholder="Retour 15 jours" />
+      </Field>
+    </div>
+
+    <Field label="Description">
+      <textarea value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+        rows={3} className={`${inputCls} resize-none`} placeholder="Décrivez votre produit en détail..." />
+    </Field>
+
+    <Field label="Tags (séparés par virgule)">
+      <input value={form.tags} onChange={e=>setForm(f=>({...f,tags:e.target.value}))} className={inputCls} placeholder="bestseller, new, trending" />
+    </Field>
+
+    {/* Upload photos */}
+    <div>
+      <label className="text-slate-400 text-xs font-medium mb-1.5 block">
+        Photos du produit <span className="text-slate-600">(max 4 · JPEG, PNG ou WebP · 2 Mo max · 800×800 px min)</span>
+      </label>
+      <div className="grid grid-cols-4 gap-2 mb-2">
+        {form.images.map((img, idx) => {
+          const isUrl = img.startsWith('/') || img.startsWith('http');
+          return (
+            <div key={idx} className="relative aspect-square bg-slate-900 rounded-xl overflow-hidden border border-slate-700 group">
+              {isUrl
+                ? <img src={img} alt="" className="w-full h-full object-cover" />
+                : <div className="w-full h-full flex items-center justify-center text-4xl">{img}</div>}
+              <button type="button" onClick={() => removeImage(idx)}
+                className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition font-bold">×</button>
+              {idx === 0 && <span className="absolute bottom-1 left-1 bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">Principal</span>}
+            </div>
+          );
+        })}
+        {form.images.length < 4 && (
+          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+            className="aspect-square bg-slate-900 rounded-xl border-2 border-dashed border-slate-600 hover:border-blue-500 flex flex-col items-center justify-center gap-1 transition disabled:opacity-50">
+            {uploading
+              ? <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              : <><svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="text-slate-500"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg><span className="text-slate-600 text-[10px]">Ajouter</span></>}
+          </button>
+        )}
+        {Array(Math.max(0, 3 - form.images.length)).fill(0).map((_, i) => (
+          <div key={`empty-${i}`} className="aspect-square bg-slate-900/50 rounded-xl border border-slate-800/50" />
+        ))}
+      </div>
+      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden"
+        onChange={e => handleImageUpload(e.target.files)} />
+      <p className="text-slate-600 text-xs">La première photo sera l'image principale.</p>
+    </div>
+
+    <div className="grid grid-cols-2 gap-3">
+      {[
+        { key:'expressDelivery', label:'Livraison express' },
+        { key:'freeDelivery',    label:'Livraison gratuite' },
+      ].map(({ key, label }) => (
+        <label key={key} className="flex items-center gap-3 bg-slate-900 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-slate-800 transition-colors border border-slate-700">
+          <div className={`w-9 h-5 rounded-full ${form[key]?'bg-blue-600':'bg-slate-700'} relative transition-colors flex-shrink-0`}
+            onClick={() => setForm(f=>({...f,[key]:!f[key]}))}>
+            <div className="absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all" style={{left: form[key]?'19px':'2px'}} />
+          </div>
+          <span className="text-slate-300 text-sm">{label}</span>
+        </label>
+      ))}
+    </div>
+
+    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-xs text-blue-400">
+      ℹ️ Votre produit sera soumis à la modération avant publication. Délai habituel : 24h.
+    </div>
+
+    <div className="flex gap-3 pt-2">
+      <button type="button" onClick={() => setModal(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition-colors">
+        Annuler
+      </button>
+      <button type="button" onClick={modal==='create' ? handleCreate : handleEdit}
+        disabled={actionLoading || !form.title || !form.price || !form.categoryId}
+        className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
+        {actionLoading ? '...' : modal==='create' ? 'Soumettre le produit' : 'Mettre à jour'}
+      </button>
+    </div>
+  </div>
+);
+
 export default function SellerProducts() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -165,157 +296,6 @@ export default function SellerProducts() {
   const discount = form.originalPrice && parseFloat(form.originalPrice) > parseFloat(form.price||0)
     ? Math.round((1 - parseFloat(form.price)/parseFloat(form.originalPrice))*100) : 0;
 
-  const ProductForm = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Titre du produit" required>
-          <input value={form.title} onChange={e=>setForm({...form,title:e.target.value})} className={inputCls} placeholder="Ex: iPhone 15 Pro 256Go" />
-        </Field>
-        <Field label="Marque / Brand">
-          <input value={form.brand} onChange={e=>setForm({...form,brand:e.target.value})} className={inputCls} placeholder="Apple, Samsung..." />
-        </Field>
-
-        <Field label="Catégorie" required>
-          <select value={form.categoryId} onChange={e=>setForm({...form, categoryId:e.target.value, subcategoryId:''})} className={inputCls}>
-            <option value="">Choisir une catégorie...</option>
-            {categories.filter(c=>!c.parentId).map(c =>
-              <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-            )}
-          </select>
-        </Field>
-
-        <Field label="Sous-catégorie">
-          <select value={form.subcategoryId} onChange={e=>setForm({...form,subcategoryId:e.target.value})} className={inputCls} disabled={!subcategories.length}>
-            <option value="">— Toute la catégorie —</option>
-            {subcategories.map(s =>
-              <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
-            )}
-          </select>
-        </Field>
-
-        <Field label="Prix de vente (DT)" required>
-          <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} min="0" step="0.001" className={inputCls} placeholder="299.000" />
-        </Field>
-        <Field label="Prix original (DT)">
-          <div className="relative">
-            <input type="number" value={form.originalPrice} onChange={e=>setForm({...form,originalPrice:e.target.value})} min="0" step="0.001" className={inputCls} placeholder="399.000" />
-            {discount > 0 && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">-{discount}%</span>}
-          </div>
-        </Field>
-
-        <Field label="Stock disponible">
-          <input type="number" value={form.stock} onChange={e=>setForm({...form,stock:e.target.value})} min="0" className={inputCls} placeholder="100" />
-        </Field>
-        <Field label="Référence / SKU">
-          <input value={form.sku} onChange={e=>setForm({...form,sku:e.target.value})} className={inputCls} placeholder="EX: TH-IP15-256-BLK" />
-        </Field>
-
-        <Field label="Garantie">
-          <input value={form.warranty} onChange={e=>setForm({...form,warranty:e.target.value})} className={inputCls} placeholder="1 an" />
-        </Field>
-        <Field label="Politique de retour">
-          <input value={form.returnPolicy} onChange={e=>setForm({...form,returnPolicy:e.target.value})} className={inputCls} placeholder="Retour 15 jours" />
-        </Field>
-      </div>
-
-      <Field label="Description">
-        <textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})}
-          rows={3} className={`${inputCls} resize-none`} placeholder="Décrivez votre produit en détail..." />
-      </Field>
-
-      <Field label="Tags (séparés par virgule)">
-        <input value={form.tags} onChange={e=>setForm({...form,tags:e.target.value})} className={inputCls} placeholder="bestseller, new, trending" />
-      </Field>
-
-      {/* Upload photos */}
-      <div>
-        <label className="text-slate-400 text-xs font-medium mb-1.5 block">
-          Photos du produit <span className="text-slate-600">(max 4 · JPEG, PNG ou WebP · 2 Mo max · 800×800 px min recommandé)</span>
-        </label>
-
-        <div className="grid grid-cols-4 gap-2 mb-2">
-          {/* Aperçus images existantes */}
-          {form.images.map((img, idx) => {
-            const isUrl = img.startsWith('/') || img.startsWith('http');
-            return (
-              <div key={idx} className="relative aspect-square bg-slate-900 rounded-xl overflow-hidden border border-slate-700 group">
-                {isUrl
-                  ? <img src={img} alt="" className="w-full h-full object-cover" />
-                  : <div className="w-full h-full flex items-center justify-center text-4xl">{img}</div>
-                }
-                <button type="button" onClick={() => removeImage(idx)}
-                  className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition font-bold">
-                  ×
-                </button>
-                {idx === 0 && <span className="absolute bottom-1 left-1 bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">Principal</span>}
-              </div>
-            );
-          })}
-
-          {/* Slot upload */}
-          {form.images.length < 4 && (
-            <button type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="aspect-square bg-slate-900 rounded-xl border-2 border-dashed border-slate-600 hover:border-blue-500 flex flex-col items-center justify-center gap-1 transition disabled:opacity-50">
-              {uploading
-                ? <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                : <>
-                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="text-slate-500"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-                    <span className="text-slate-600 text-[10px]">Ajouter</span>
-                  </>
-              }
-            </button>
-          )}
-
-          {/* Slots vides */}
-          {Array(Math.max(0, 3 - form.images.length)).fill(0).map((_, i) => (
-            <div key={`empty-${i}`} className="aspect-square bg-slate-900/50 rounded-xl border border-slate-800/50" />
-          ))}
-        </div>
-
-        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp"
-          multiple className="hidden"
-          onChange={e => handleImageUpload(e.target.files)} />
-
-        <p className="text-slate-600 text-xs">La première photo sera l'image principale affichée sur la marketplace.</p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex items-center gap-3 bg-slate-900 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-slate-800 transition-colors border border-slate-700">
-          <div className={`w-9 h-5 rounded-full ${form.expressDelivery?'bg-blue-600':'bg-slate-700'} relative transition-colors`}
-            onClick={() => setForm({...form,expressDelivery:!form.expressDelivery})}>
-            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${form.expressDelivery?'left-4.5':'left-0.5'}`} style={{left: form.expressDelivery?'19px':'2px'}} />
-          </div>
-          <span className="text-slate-300 text-sm">Livraison express</span>
-        </label>
-        <label className="flex items-center gap-3 bg-slate-900 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-slate-800 transition-colors border border-slate-700">
-          <div className={`w-9 h-5 rounded-full ${form.freeDelivery?'bg-blue-600':'bg-slate-700'} relative transition-colors`}
-            onClick={() => setForm({...form,freeDelivery:!form.freeDelivery})}>
-            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all`} style={{left: form.freeDelivery?'19px':'2px'}} />
-          </div>
-          <span className="text-slate-300 text-sm">Livraison gratuite</span>
-        </label>
-      </div>
-
-      {/* Info modération */}
-      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-xs text-blue-400">
-        ℹ️ Votre produit sera soumis à la modération de l'équipe MARKET avant publication. Délai habituel : 24h.
-      </div>
-
-      <div className="flex gap-3 pt-2">
-        <button type="button" onClick={() => setModal(null)} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition-colors">
-          Annuler
-        </button>
-        <button type="button" onClick={modal==='create' ? handleCreate : handleEdit}
-          disabled={actionLoading || !form.title || !form.price || !form.categoryId}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
-          {actionLoading ? '...' : modal==='create' ? 'Soumettre le produit' : 'Mettre à jour'}
-        </button>
-      </div>
-    </div>
-  );
-
   return (
     <div className="p-6 max-w-6xl">
       {error   && <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg p-3 mb-4">{error}</div>}
@@ -429,7 +409,15 @@ export default function SellerProducts() {
       {/* Modals */}
       {(modal === 'create' || modal === 'edit') && (
         <Modal title={modal === 'create' ? 'Ajouter un produit' : 'Modifier le produit'} onClose={() => setModal(null)} wide>
-          <ProductForm />
+          <ProductForm
+            form={form} setForm={setForm}
+            categories={categories} subcategories={subcategories}
+            discount={discount} fileInputRef={fileInputRef}
+            uploading={uploading} handleImageUpload={handleImageUpload} removeImage={removeImage}
+            actionLoading={actionLoading} modal={modal}
+            handleCreate={handleCreate} handleEdit={handleEdit}
+            setModal={setModal}
+          />
         </Modal>
       )}
 
