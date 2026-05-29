@@ -242,7 +242,8 @@ export const CategoryBar = () => {
 
   return (
     <div className="bg-white border-b border-gray-200 shadow-sm relative z-40">
-      <div className="max-w-[1400px] mx-auto px-4 h-12 flex items-center gap-1 overflow-x-auto scrollbar-hide">
+      {/* overflow-visible ici pour que les dropdowns ne soient pas coupés */}
+      <div className="max-w-[1400px] mx-auto px-4 h-12 flex items-center gap-1" style={{ overflowX: 'visible', overflowY: 'visible' }}>
 
         {/* Bouton "Toutes catégories" */}
         <div ref={menuRef} className="relative flex-shrink-0">
@@ -317,28 +318,40 @@ export const CategoryBar = () => {
 
 const CatItem = ({ cat, navigate }) => {
   const [open, setOpen] = useState(false);
-  let timer = null;
+  const [pos, setPos]   = useState({ left: 0, top: 0 });
+  const btnRef = useRef(null);
+  const timerRef = useRef(null);
 
-  const show = () => { clearTimeout(timer); setOpen(true); };
-  const hide = () => { timer = setTimeout(() => setOpen(false), 150); };
+  const show = () => {
+    clearTimeout(timerRef.current);
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ left: r.left, top: r.bottom + window.scrollY });
+    }
+    setOpen(true);
+  };
+  const hide = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
 
   return (
     <div className="relative flex-shrink-0" onMouseEnter={show} onMouseLeave={hide}>
-      <button
+      <button ref={btnRef}
         onClick={() => navigate('category', { slug: cat.slug })}
         className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full transition whitespace-nowrap ${open ? 'bg-blue-50 text-blue-600' : 'text-slate-700 hover:text-blue-600 hover:bg-blue-50'}`}>
         <span>{cat.icon}</span>
         <span>{cat.name}</span>
-        {cat.children?.length > 0 && <Icon name="chevD" size={12} className="opacity-50" />}
+        {cat.children?.length > 0 && <Icon name="chevD" size={11} className="opacity-40 ml-0.5" />}
       </button>
 
       {open && cat.children?.length > 0 && (
-        <div className="absolute top-full left-0 mt-0 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 py-2 anim-fadeIn"
-          style={{ minWidth: 220 }}>
+        <div
+          onMouseEnter={() => clearTimeout(timerRef.current)}
+          onMouseLeave={hide}
+          style={{ position: 'fixed', left: pos.left, top: pos.top, minWidth: 220, zIndex: 9999 }}
+          className="bg-white rounded-xl shadow-2xl border border-gray-200 py-2 anim-fadeIn">
           <div className="px-4 py-1.5 mb-1 border-b border-gray-100">
             <button onClick={() => { navigate('category', { slug: cat.slug }); setOpen(false); }}
-              className="text-xs font-bold text-blue-600 hover:underline">
-              {cat.icon} Tout — {cat.name}
+              className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1.5">
+              <span>{cat.icon}</span> Tout — {cat.name}
             </button>
           </div>
           {cat.children.map(sub => (
