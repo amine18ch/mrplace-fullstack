@@ -2,16 +2,16 @@ const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// GET /api/categories — arbre complet (parents + enfants)
+// GET /api/categories — arbre complet (visibles uniquement)
 router.get('/', async (req, res) => {
   try {
     const all = await prisma.category.findMany({
+      where: { isVisible: true },
       include: { _count: { select: { products: true } } },
-      orderBy: { id: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
     });
-    // Séparer parents et enfants
-    const parents = all.filter(c => !c.parentId);
-    const children = all.filter(c => c.parentId);
+    const parents  = all.filter(c => !c.parentId);
+    const children = all.filter(c => !!c.parentId);
     const tree = parents.map(p => ({
       ...p,
       children: children.filter(c => c.parentId === p.id),
