@@ -12,7 +12,13 @@ app.use(cors({ origin: '*', credentials: false }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Servir les images uploadées
+const UPLOADS_DIR = path.join(__dirname, '../../uploads');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+app.use('/uploads', express.static(UPLOADS_DIR));
+
 // Routes
+app.use('/api/upload',     require('./routes/upload'));
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/products',   require('./routes/products'));
 app.use('/api/cart',       require('./routes/cart'));

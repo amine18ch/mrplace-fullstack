@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAdmin } from '../context/AdminContext';
 import { adminApi } from '../api/adminClient';
 
@@ -10,9 +10,11 @@ export default function AdminCategories() {
   const { can } = useAdmin();
   const [tree, setTree]     = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal]   = useState(null); // null | {mode:'create'|'edit', data?}
-  const [form, setForm]     = useState({ name:'', icon:'📦', parentId:'', sortOrder:'0' });
-  const [saving, setSaving] = useState(false);
+  const [modal, setModal]      = useState(null);
+  const [form, setForm]        = useState({ name:'', icon:'📦', parentId:'', sortOrder:'0', iconMode:'emoji' });
+  const [saving, setSaving]    = useState(false);
+  const [uploading, setUpload] = useState(false);
+  const catFileRef = useRef(null);
   const [error, setError]   = useState('');
   const [success, setSuccess] = useState('');
   const [expanded, setExpanded] = useState({});
@@ -31,15 +33,37 @@ export default function AdminCategories() {
   };
 
   const openCreate = (parentId = '') => {
-    setForm({ name:'', icon:'📦', parentId: String(parentId), sortOrder:'0' });
+    const isUrl = false;
+    setForm({ name:'', icon:'📦', parentId: String(parentId), sortOrder:'0', iconMode:'emoji' });
     setError('');
     setModal({ mode:'create' });
   };
 
   const openEdit = (cat) => {
-    setForm({ name: cat.name, icon: cat.icon, parentId: cat.parentId ? String(cat.parentId) : '', sortOrder: String(cat.sortOrder || 0) });
+    const isUrl = cat.icon && (cat.icon.startsWith('/') || cat.icon.startsWith('http'));
+    setForm({ name: cat.name, icon: cat.icon, parentId: cat.parentId ? String(cat.parentId) : '', sortOrder: String(cat.sortOrder || 0), iconMode: isUrl ? 'photo' : 'emoji' });
     setError('');
     setModal({ mode:'edit', id: cat.id, name: cat.name });
+  };
+
+  const handleCatImageUpload = async (file) => {
+    if (!file) return;
+    setUpload(true);
+    try {
+      const { getAdminToken } = await import('../api/adminClient');
+      const token = getAdminToken() || '';
+      const formData = new FormData();
+      formData.append('image', file);
+      const res = await fetch('/api/upload/categories', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setForm(f => ({ ...f, icon: data.url }));
+    } catch (e) { setError(e.message); }
+    setUpload(false);
   };
 
   const save = async () => {
@@ -229,23 +253,46 @@ export default function AdminCategories() {
             <div className="p-5 space-y-4">
               {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg p-3">{error}</div>}
 
-              {/* Icône */}
+              {/* Icône ou Photo */}
               <div>
-                <label className="text-slate-400 text-xs font-medium mb-2 block">Icône</label>
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-3xl">
-                    {form.icon}
+                <label className="text-slate-400 text-xs font-medium mb-2 block">Icône / Visuel</label>
+
+                {/* Aperçu */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-14 h-14 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden">
+                    {form.icon && (form.icon.startsWith('/') || form.icon.startsWith('http'))
+                      ? <img src={form.icon} alt="" className="w-full h-full object-cover" />
+                      : <span className="text-3xl">{form.icon || '📦'}</span>}
                   </div>
-                  <span className="text-slate-500 text-xs">Choisissez un emoji</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 bg-slate-900 rounded-xl p-3 border border-slate-700 max-h-32 overflow-y-auto">
-                  {EMOJIS.map(e => (
-                    <button key={e} type="button" onClick={() => setForm(f => ({ ...f, icon: e }))}
-                      className={`text-xl p-1.5 rounded-lg transition hover:bg-slate-700 ${form.icon === e ? 'bg-slate-700 ring-2 ring-blue-500' : ''}`}>
-                      {e}
+                  {/* Toggle emoji / photo */}
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setForm(f => ({ ...f, iconMode:'emoji', icon: f.icon.startsWith('/') ? '📦' : f.icon }))}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${form.iconMode==='emoji' ? 'border-blue-500 bg-blue-500/20 text-blue-300' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
+                      Emoji
                     </button>
-                  ))}
+                    <button type="button" onClick={() => { setForm(f => ({ ...f, iconMode:'photo' })); catFileRef.current?.click(); }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${form.iconMode==='photo' ? 'border-blue-500 bg-blue-500/20 text-blue-300' : 'border-slate-700 bg-slate-800 text-slate-400'}`}>
+                      {uploading ? '...' : '📷 Photo'}
+                    </button>
+                  </div>
+                  <input ref={catFileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                    onChange={e => { if (e.target.files[0]) { setForm(f => ({ ...f, iconMode:'photo' })); handleCatImageUpload(e.target.files[0]); } }} />
                 </div>
+
+                {/* Format info */}
+                <p className="text-slate-600 text-xs mb-2">Photo : JPEG, PNG ou WebP · Max 500 Ko · 200×200 px recommandé (carré)</p>
+
+                {/* Picker emoji */}
+                {form.iconMode === 'emoji' && (
+                  <div className="flex flex-wrap gap-1.5 bg-slate-900 rounded-xl p-3 border border-slate-700 max-h-28 overflow-y-auto">
+                    {EMOJIS.map(e => (
+                      <button key={e} type="button" onClick={() => setForm(f => ({ ...f, icon: e }))}
+                        className={`text-xl p-1.5 rounded-lg transition hover:bg-slate-700 ${form.icon === e ? 'bg-slate-700 ring-2 ring-blue-500' : ''}`}>
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Nom */}

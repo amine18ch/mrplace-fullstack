@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
-import { sellerApi } from '../api/sellerClient';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { sellerApi, uploadProductImage } from '../api/sellerClient';
 import { useSeller } from '../context/SellerContext';
 
 const EMOJIS = ['📱','💻','👗','🏠','💄','⚽','🧸','🛒','🚗','📺','🎧','⌚','👟','👔','🧥','👜','🧹','🍳','🛞','📷','📚','🎮','🌿','💎','🍵','☕'];
@@ -40,13 +40,14 @@ export default function SellerProducts() {
   const [error, setError]       = useState('');
   const [success, setSuccess]   = useState('');
 
-  const emptyForm = { title:'', brand:'', categoryId:'', subcategoryId:'', sku:'', price:'', originalPrice:'', description:'', stock:'100', warranty:'1 an', returnPolicy:'Retour 15 jours', expressDelivery:true, freeDelivery:true, images:['📦'], tags:'' };
+  const emptyForm = { title:'', brand:'', categoryId:'', subcategoryId:'', sku:'', price:'', originalPrice:'', description:'', stock:'100', warranty:'1 an', returnPolicy:'Retour 15 jours', expressDelivery:true, freeDelivery:true, images:[], tags:'' };
   const [modal, setModal]       = useState(null);
   const [form, setForm]         = useState(emptyForm);
   const [editId, setEditId]     = useState(null);
-  const [selectedEmoji, setSelectedEmoji] = useState('📦');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [subcategories, setSubcategories] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -90,12 +91,10 @@ export default function SellerProducts() {
   };
 
   const openCreate = () => {
-    setForm(emptyForm); setSelectedEmoji('📦'); setEditId(null); setModal('create');
+    setForm(emptyForm); setEditId(null); setModal('create');
   };
   const openEdit = (p) => {
     setEditId(p.id);
-    setSelectedEmoji(p.images?.[0] || '📦');
-    // Détecter si categoryId est une sous-catégorie (a un parent)
     const allCats = categories.flatMap(c => [c, ...(c.children||[])]);
     const cat = allCats.find(c => c.id === p.categoryId);
     const parentId = cat?.parentId ? String(cat.parentId) : String(p.categoryId);
@@ -108,13 +107,29 @@ export default function SellerProducts() {
       description: p.description || '', stock: String(p.stock),
       warranty: p.warranty, returnPolicy: p.returnPolicy,
       expressDelivery: p.expressDelivery, freeDelivery: p.freeDelivery,
-      images: p.images || ['📦'], tags: (p.tags||[]).join(', '),
+      images: p.images || [], tags: (p.tags||[]).join(', '),
     });
     setModal('edit');
   };
 
+  const handleImageUpload = async (files) => {
+    if (!files?.length) return;
+    const remaining = 4 - form.images.length;
+    if (remaining <= 0) return flash('Maximum 4 images par produit', true);
+    setUploading(true);
+    const toUpload = Array.from(files).slice(0, remaining);
+    try {
+      const uploaded = await Promise.all(toUpload.map(f => uploadProductImage(f)));
+      setForm(f => ({ ...f, images: [...f.images, ...uploaded.map(u => u.url)] }));
+    } catch (e) { flash(e.message, true); }
+    setUploading(false);
+  };
+
+  const removeImage = (idx) => {
+    setForm(f => ({ ...f, images: f.images.filter((_, i) => i !== idx) }));
+  };
+
   const buildPayload = () => {
-    // Si sous-catégorie sélectionnée, utiliser son ID ; sinon celui de la catégorie parente
     const finalCategoryId = form.subcategoryId
       ? parseInt(form.subcategoryId)
       : parseInt(form.categoryId);
@@ -127,7 +142,7 @@ export default function SellerProducts() {
       description: form.description, stock: parseInt(form.stock),
       warranty: form.warranty, returnPolicy: form.returnPolicy,
       expressDelivery: form.expressDelivery, freeDelivery: form.freeDelivery,
-      images: [selectedEmoji],
+      images: form.images.length ? form.images : ['📦'],
       tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
     };
   };
@@ -212,21 +227,59 @@ export default function SellerProducts() {
         <input value={form.tags} onChange={e=>setForm({...form,tags:e.target.value})} className={inputCls} placeholder="bestseller, new, trending" />
       </Field>
 
-      <Field label="Image / Icône du produit">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="w-16 h-16 bg-slate-900 rounded-xl flex items-center justify-center text-4xl border border-slate-700">
-            {selectedEmoji}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {EMOJIS.map(e => (
-              <button key={e} type="button" onClick={() => setSelectedEmoji(e)}
-                className={`text-2xl p-1.5 rounded-lg transition-colors hover:bg-slate-700 ${selectedEmoji===e?'bg-slate-700 ring-2 ring-blue-500':''}`}>
-                {e}
-              </button>
-            ))}
-          </div>
+      {/* Upload photos */}
+      <div>
+        <label className="text-slate-400 text-xs font-medium mb-1.5 block">
+          Photos du produit <span className="text-slate-600">(max 4 · JPEG, PNG ou WebP · 2 Mo max · 800×800 px min recommandé)</span>
+        </label>
+
+        <div className="grid grid-cols-4 gap-2 mb-2">
+          {/* Aperçus images existantes */}
+          {form.images.map((img, idx) => {
+            const isUrl = img.startsWith('/') || img.startsWith('http');
+            return (
+              <div key={idx} className="relative aspect-square bg-slate-900 rounded-xl overflow-hidden border border-slate-700 group">
+                {isUrl
+                  ? <img src={img} alt="" className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center text-4xl">{img}</div>
+                }
+                <button type="button" onClick={() => removeImage(idx)}
+                  className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition font-bold">
+                  ×
+                </button>
+                {idx === 0 && <span className="absolute bottom-1 left-1 bg-blue-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">Principal</span>}
+              </div>
+            );
+          })}
+
+          {/* Slot upload */}
+          {form.images.length < 4 && (
+            <button type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="aspect-square bg-slate-900 rounded-xl border-2 border-dashed border-slate-600 hover:border-blue-500 flex flex-col items-center justify-center gap-1 transition disabled:opacity-50">
+              {uploading
+                ? <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                : <>
+                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="text-slate-500"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                    <span className="text-slate-600 text-[10px]">Ajouter</span>
+                  </>
+              }
+            </button>
+          )}
+
+          {/* Slots vides */}
+          {Array(Math.max(0, 3 - form.images.length)).fill(0).map((_, i) => (
+            <div key={`empty-${i}`} className="aspect-square bg-slate-900/50 rounded-xl border border-slate-800/50" />
+          ))}
         </div>
-      </Field>
+
+        <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp"
+          multiple className="hidden"
+          onChange={e => handleImageUpload(e.target.files)} />
+
+        <p className="text-slate-600 text-xs">La première photo sera l'image principale affichée sur la marketplace.</p>
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <label className="flex items-center gap-3 bg-slate-900 rounded-lg px-3 py-2.5 cursor-pointer hover:bg-slate-800 transition-colors border border-slate-700">
@@ -317,8 +370,11 @@ export default function SellerProducts() {
           {products.map(p => (
             <div key={p.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition-colors">
               {/* Image */}
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 h-32 flex items-center justify-center text-6xl relative">
-                {p.images?.[0] || '📦'}
+              <div className="bg-slate-800 h-32 flex items-center justify-center relative overflow-hidden">
+                {(() => { const img = p.images?.[0]; return img && (img.startsWith('/') || img.startsWith('http'))
+                  ? <img src={img} alt={p.title} className="w-full h-full object-cover" />
+                  : <span className="text-6xl">{img || '📦'}</span>; })()
+                }
                 <span className={`absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full ${STATUS_C[p.status] || STATUS_C['PENDING']}`}>
                   {STATUS_LABEL[p.status] || 'Modération'}
                 </span>

@@ -25,3 +25,18 @@ export const sellerApi = {
   patch:  (path, body)  => req('PATCH',  path, body),
   delete: (path)        => req('DELETE', path),
 };
+
+// Upload une image produit (multipart)
+export const uploadProductImage = async (file) => {
+  const token = getSellerToken();
+  const formData = new FormData();
+  formData.append('image', file);
+  const res = await fetch('/api/upload/products', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Erreur upload');
+  return data; // { url, filename }
+};
