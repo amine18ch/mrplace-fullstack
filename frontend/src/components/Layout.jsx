@@ -1,19 +1,16 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { productsApi } from '../api/client';
+import { productsApi, categoriesApi } from '../api/client';
 import { fmt } from './ui';
 import Icon from './Icon';
 
-const CATEGORIES = [
-  { slug:'electronics', name:'Électronique', icon:'📱' },
-  { slug:'fashion',     name:'Mode',         icon:'👕' },
-  { slug:'home',        name:'Maison & Cuisine', icon:'🛋️' },
-  { slug:'beauty',      name:'Beauté',       icon:'💄' },
-  { slug:'sports',      name:'Sports',       icon:'⚽' },
-  { slug:'toys',        name:'Jouets & Bébé', icon:'🧸' },
-  { slug:'grocery',     name:'Épicerie',     icon:'🛒' },
-  { slug:'auto',        name:'Auto',         icon:'🚗' },
-];
+// Cache global des catégories pour éviter les rechargements
+let _catCache = null;
+const getCats = async () => {
+  if (_catCache) return _catCache;
+  _catCache = await categoriesApi.list();
+  return _catCache;
+};
 
 // ── Search Bar
 const SearchBar = () => {
@@ -221,33 +218,93 @@ export const Header = () => {
   );
 };
 
-// ── Category Bar
+// ── Category Bar avec mega-menu dynamique
 export const CategoryBar = () => {
   const { navigate } = useApp();
-  const [open, setOpen] = useState(false);
+  const [cats, setCats]         = useState([]);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [hovered, setHovered]   = useState(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    getCats().then(tree => {
+      setCats(tree);
+      if (tree.length) setHovered(tree[0]);
+    }).catch(() => {});
+  }, []);
+
+  const closeMenu = () => { setMenuOpen(false); };
+
   return (
-    <div className="bg-white border-b border-gray-200 shadow-sm">
+    <div className="bg-white border-b border-gray-200 shadow-sm relative z-40">
       <div className="max-w-[1400px] mx-auto px-4 h-12 flex items-center gap-1 overflow-x-auto scrollbar-hide">
-        <div onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)} className="relative">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition">
+
+        {/* Bouton "Toutes catégories" */}
+        <div ref={menuRef} className="relative flex-shrink-0">
+          <button
+            onMouseEnter={() => { setMenuOpen(true); if (cats.length) setHovered(cats[0]); }}
+            onClick={() => setMenuOpen(o => !o)}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition whitespace-nowrap">
             <Icon name="menu" size={16} />Catégories<Icon name="chevD" size={14} />
           </button>
-          {open && (
-            <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 w-72 z-50 overflow-hidden anim-fadeIn">
-              {CATEGORIES.map(c => (
-                <div key={c.slug} onClick={() => { navigate('category', { slug: c.slug }); setOpen(false); }}
-                  className="flex items-center gap-3 p-3 hover:bg-blue-50 cursor-pointer transition border-b last:border-0">
-                  <span className="text-2xl">{c.icon}</span>
-                  <span className="flex-1 text-sm font-semibold text-slate-800">{c.name}</span>
-                  <Icon name="chevR" size={16} className="text-gray-400" />
-                </div>
-              ))}
+
+          {/* Mega-menu */}
+          {menuOpen && (
+            <div
+              className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 flex anim-fadeIn"
+              style={{ width: 560 }}
+              onMouseLeave={closeMenu}>
+              {/* Colonne gauche — catégories parentes */}
+              <div className="w-52 border-r border-gray-100 py-2 overflow-y-auto" style={{ maxHeight: 420 }}>
+                {cats.map(c => (
+                  <div key={c.id}
+                    onMouseEnter={() => setHovered(c)}
+                    onClick={() => { navigate('category', { slug: c.slug }); closeMenu(); }}
+                    className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition ${hovered?.id === c.id ? 'bg-blue-50 text-blue-600' : 'hover:bg-gray-50 text-slate-700'}`}>
+                    <span className="text-xl flex-shrink-0">{c.icon}</span>
+                    <span className="text-sm font-medium flex-1 leading-tight">{c.name}</span>
+                    {c.children?.length > 0 && <Icon name="chevR" size={14} className="text-gray-400 flex-shrink-0" />}
+                  </div>
+                ))}
+              </div>
+
+              {/* Colonne droite — sous-catégories */}
+              <div className="flex-1 p-4 overflow-y-auto" style={{ maxHeight: 420 }}>
+                {hovered && (
+                  <>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-2xl">{hovered.icon}</span>
+                      <div>
+                        <div className="font-bold text-slate-800 text-sm">{hovered.name}</div>
+                        <button onClick={() => { navigate('category', { slug: hovered.slug }); closeMenu(); }}
+                          className="text-xs text-blue-600 hover:underline">Voir tout →</button>
+                      </div>
+                    </div>
+                    {hovered.children?.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-1">
+                        {hovered.children.map(sub => (
+                          <div key={sub.id}
+                            onClick={() => { navigate('category', { slug: sub.slug }); closeMenu(); }}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-blue-50 cursor-pointer transition group">
+                            <span className="text-base flex-shrink-0">{sub.icon}</span>
+                            <span className="text-xs text-slate-600 group-hover:text-blue-600 leading-tight">{sub.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-400">Pas de sous-catégories</div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
-        {CATEGORIES.map(c => (
+
+        {/* Raccourcis horizontaux — catégories principales */}
+        {cats.slice(0, 8).map(c => (
           <button key={c.slug} onClick={() => navigate('category', { slug: c.slug })}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-full transition whitespace-nowrap">
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-full transition whitespace-nowrap flex-shrink-0">
             <span>{c.icon}</span>{c.name}
           </button>
         ))}

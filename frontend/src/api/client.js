@@ -76,7 +76,9 @@ export const sellersApi = {
 
 // Categories
 export const categoriesApi = {
-  list:   ()     => api.get('/categories', false),
+  list:   ()     => api.get('/categories', false),       // arbre avec children
+  flat:   ()     => api.get('/categories/flat', false),  // liste plate
+  get:    (slug) => api.get(`/categories/${slug}`, false),
   brands: (slug) => api.get(`/categories/${slug}/brands`, false),
 };
 

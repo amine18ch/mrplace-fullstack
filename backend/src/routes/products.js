@@ -29,8 +29,19 @@ router.get('/', async (req, res) => {
     } = req.query;
 
     const where = { isActive: true };
-    if (category) where.category = { slug: category };
-    if (subcategory) where.subcategory = subcategory;
+    if (category) {
+      // Inclure catégorie ET toutes ses sous-catégories
+      const cat = await prisma.category.findUnique({ where: { slug: category } });
+      if (cat) {
+        const children = await prisma.category.findMany({ where: { parentId: cat.id } });
+        const ids = [cat.id, ...children.map(c => c.id)];
+        where.categoryId = { in: ids };
+      }
+    }
+    if (subcategory) {
+      const sub = await prisma.category.findUnique({ where: { slug: subcategory } });
+      if (sub) where.categoryId = sub.id;
+    }
     if (brand) where.brand = { in: brand.split(',') };
     if (sellerId) where.sellerId = parseInt(sellerId);
     if (search) where.OR = [

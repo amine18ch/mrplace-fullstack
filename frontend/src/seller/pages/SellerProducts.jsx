@@ -5,8 +5,8 @@ import { useSeller } from '../context/SellerContext';
 const EMOJIS = ['📱','💻','👗','🏠','💄','⚽','🧸','🛒','🚗','📺','🎧','⌚','👟','👔','🧥','👜','🧹','🍳','🛞','📷','📚','🎮','🌿','💎','🍵','☕'];
 const inputCls = "w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:border-blue-500 transition-colors placeholder:text-slate-600";
 
-const STATUS = { true:'Actif', false:'En modération' };
-const STATUS_C = { true:'bg-green-500/20 text-green-400', false:'bg-yellow-500/20 text-yellow-400' };
+const STATUS_LABEL = { PUBLISHED:'Publié', PENDING:'Modération', DRAFT:'Brouillon', OUT_OF_STOCK:'Rupture' };
+const STATUS_C     = { PUBLISHED:'bg-green-500/20 text-green-400', PENDING:'bg-yellow-500/20 text-yellow-400', DRAFT:'bg-slate-500/20 text-slate-400', OUT_OF_STOCK:'bg-red-500/20 text-red-400' };
 
 const Modal = ({ title, onClose, children, wide }) => (
   <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -40,12 +40,13 @@ export default function SellerProducts() {
   const [error, setError]       = useState('');
   const [success, setSuccess]   = useState('');
 
-  const emptyForm = { title:'', brand:'', categoryId:'', subcategory:'', price:'', originalPrice:'', description:'', stock:'100', warranty:'1 an', returnPolicy:'Retour 15 jours', expressDelivery:true, freeDelivery:true, images:['📦'], tags:'' };
-  const [modal, setModal]       = useState(null); // null | 'create' | 'edit'
+  const emptyForm = { title:'', brand:'', categoryId:'', subcategoryId:'', sku:'', price:'', originalPrice:'', description:'', stock:'100', warranty:'1 an', returnPolicy:'Retour 15 jours', expressDelivery:true, freeDelivery:true, images:['📦'], tags:'' };
+  const [modal, setModal]       = useState(null);
   const [form, setForm]         = useState(emptyForm);
   const [editId, setEditId]     = useState(null);
   const [selectedEmoji, setSelectedEmoji] = useState('📦');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [subcategories, setSubcategories] = useState([]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -59,9 +60,22 @@ export default function SellerProducts() {
   }, [page, search, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
+
   useEffect(() => {
     fetch('/api/categories').then(r => r.json()).then(setCategories).catch(() => {});
   }, []);
+
+  // Charger les sous-catégories quand la catégorie change
+  useEffect(() => {
+    if (!form.categoryId) { setSubcategories([]); return; }
+    const parent = categories.find(c => c.id === parseInt(form.categoryId));
+    setSubcategories(parent?.children || []);
+    // Réinitialiser la sous-catégorie si elle n'appartient plus au bon parent
+    if (form.subcategoryId) {
+      const still = (parent?.children || []).find(s => s.id === parseInt(form.subcategoryId));
+      if (!still) setForm(f => ({ ...f, subcategoryId: '' }));
+    }
+  }, [form.categoryId, categories]);
 
   const flash = (msg, isErr=false) => {
     if (isErr) setError(msg); else setSuccess(msg);
@@ -81,9 +95,15 @@ export default function SellerProducts() {
   const openEdit = (p) => {
     setEditId(p.id);
     setSelectedEmoji(p.images?.[0] || '📦');
+    // Détecter si categoryId est une sous-catégorie (a un parent)
+    const allCats = categories.flatMap(c => [c, ...(c.children||[])]);
+    const cat = allCats.find(c => c.id === p.categoryId);
+    const parentId = cat?.parentId ? String(cat.parentId) : String(p.categoryId);
+    const subId    = cat?.parentId ? String(p.categoryId) : '';
     setForm({
-      title: p.title, brand: p.brand || '', categoryId: String(p.categoryId),
-      subcategory: p.subcategory || '', price: String(p.price),
+      title: p.title, brand: p.brand || '',
+      categoryId: parentId, subcategoryId: subId,
+      sku: p.sku || '', price: String(p.price),
       originalPrice: String(p.originalPrice || p.price),
       description: p.description || '', stock: String(p.stock),
       warranty: p.warranty, returnPolicy: p.returnPolicy,
@@ -93,16 +113,24 @@ export default function SellerProducts() {
     setModal('edit');
   };
 
-  const buildPayload = () => ({
-    title: form.title, brand: form.brand, categoryId: parseInt(form.categoryId),
-    subcategory: form.subcategory, price: parseFloat(form.price),
-    originalPrice: parseFloat(form.originalPrice || form.price),
-    description: form.description, stock: parseInt(form.stock),
-    warranty: form.warranty, returnPolicy: form.returnPolicy,
-    expressDelivery: form.expressDelivery, freeDelivery: form.freeDelivery,
-    images: [selectedEmoji],
-    tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-  });
+  const buildPayload = () => {
+    // Si sous-catégorie sélectionnée, utiliser son ID ; sinon celui de la catégorie parente
+    const finalCategoryId = form.subcategoryId
+      ? parseInt(form.subcategoryId)
+      : parseInt(form.categoryId);
+    return {
+      title: form.title, brand: form.brand,
+      categoryId: finalCategoryId,
+      sku: form.sku || undefined,
+      price: parseFloat(form.price),
+      originalPrice: parseFloat(form.originalPrice || form.price),
+      description: form.description, stock: parseInt(form.stock),
+      warranty: form.warranty, returnPolicy: form.returnPolicy,
+      expressDelivery: form.expressDelivery, freeDelivery: form.freeDelivery,
+      images: [selectedEmoji],
+      tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+    };
+  };
 
   const handleCreate = () => act(async () => {
     await sellerApi.post('/products', buildPayload());
@@ -131,15 +159,25 @@ export default function SellerProducts() {
         <Field label="Marque / Brand">
           <input value={form.brand} onChange={e=>setForm({...form,brand:e.target.value})} className={inputCls} placeholder="Apple, Samsung..." />
         </Field>
+
         <Field label="Catégorie" required>
-          <select value={form.categoryId} onChange={e=>setForm({...form,categoryId:e.target.value})} className={inputCls}>
-            <option value="">Choisir...</option>
-            {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+          <select value={form.categoryId} onChange={e=>setForm({...form, categoryId:e.target.value, subcategoryId:''})} className={inputCls}>
+            <option value="">Choisir une catégorie...</option>
+            {categories.filter(c=>!c.parentId).map(c =>
+              <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+            )}
           </select>
         </Field>
+
         <Field label="Sous-catégorie">
-          <input value={form.subcategory} onChange={e=>setForm({...form,subcategory:e.target.value})} className={inputCls} placeholder="Téléphones, Laptops..." />
+          <select value={form.subcategoryId} onChange={e=>setForm({...form,subcategoryId:e.target.value})} className={inputCls} disabled={!subcategories.length}>
+            <option value="">— Toute la catégorie —</option>
+            {subcategories.map(s =>
+              <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
+            )}
+          </select>
         </Field>
+
         <Field label="Prix de vente (DT)" required>
           <input type="number" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} min="0" step="0.001" className={inputCls} placeholder="299.000" />
         </Field>
@@ -149,11 +187,19 @@ export default function SellerProducts() {
             {discount > 0 && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full">-{discount}%</span>}
           </div>
         </Field>
+
         <Field label="Stock disponible">
           <input type="number" value={form.stock} onChange={e=>setForm({...form,stock:e.target.value})} min="0" className={inputCls} placeholder="100" />
         </Field>
+        <Field label="Référence / SKU">
+          <input value={form.sku} onChange={e=>setForm({...form,sku:e.target.value})} className={inputCls} placeholder="EX: TH-IP15-256-BLK" />
+        </Field>
+
         <Field label="Garantie">
           <input value={form.warranty} onChange={e=>setForm({...form,warranty:e.target.value})} className={inputCls} placeholder="1 an" />
+        </Field>
+        <Field label="Politique de retour">
+          <input value={form.returnPolicy} onChange={e=>setForm({...form,returnPolicy:e.target.value})} className={inputCls} placeholder="Retour 15 jours" />
         </Field>
       </div>
 
@@ -273,8 +319,8 @@ export default function SellerProducts() {
               {/* Image */}
               <div className="bg-gradient-to-br from-slate-800 to-slate-900 h-32 flex items-center justify-center text-6xl relative">
                 {p.images?.[0] || '📦'}
-                <span className={`absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full ${STATUS_C[p.isActive]}`}>
-                  {STATUS[p.isActive]}
+                <span className={`absolute top-2 right-2 text-[10px] px-2 py-0.5 rounded-full ${STATUS_C[p.status] || STATUS_C['PENDING']}`}>
+                  {STATUS_LABEL[p.status] || 'Modération'}
                 </span>
                 {p.discount > 0 && (
                   <span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">
@@ -284,8 +330,12 @@ export default function SellerProducts() {
               </div>
               {/* Info */}
               <div className="p-4">
-                <div className="text-xs text-blue-400 font-medium mb-1">{p.brand}</div>
-                <div className="text-slate-200 text-sm font-medium line-clamp-2 mb-2 min-h-[36px]">{p.title}</div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-blue-400 font-medium">{p.brand}</span>
+                  {p.category && <span className="text-xs text-slate-600">{p.category.icon} {p.category.name}</span>}
+                </div>
+                <div className="text-slate-200 text-sm font-medium line-clamp-2 mb-1 min-h-[36px]">{p.title}</div>
+                {p.sku && <div className="text-xs text-slate-600 mb-1 font-mono">SKU: {p.sku}</div>}
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <div className="text-white font-bold">{new Intl.NumberFormat('fr-TN',{minimumFractionDigits:3}).format(p.price)} DT</div>

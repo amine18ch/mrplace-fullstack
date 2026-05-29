@@ -110,11 +110,13 @@ model Product {
   reviewsCount    Int         @default(0)
   soldCount       Int         @default(0)
   tags            String      @default("[]")
+  sku             String?
   warranty        String      @default("1 an")
   returnPolicy    String      @default("Retour 15 jours")
   expressDelivery Boolean     @default(true)
   freeDelivery    Boolean     @default(true)
-  isActive        Boolean     @default(true)
+  status          String      @default("PENDING")
+  isActive        Boolean     @default(false)
   cartItems       CartItem[]
   wishlistItems   Wishlist[]
   orderItems      OrderItem[]

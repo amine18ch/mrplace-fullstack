@@ -93,7 +93,7 @@ router.patch('/:id', requireRole('MODERATEUR'), async (req, res) => {
 // PATCH /api/admin/products/:id/approve
 router.patch('/:id/approve', requireRole('MODERATEUR'), async (req, res) => {
   try {
-    const product = await prisma.product.update({ where: { id: parseInt(req.params.id) }, data: { isActive: true } });
+    const product = await prisma.product.update({ where: { id: parseInt(req.params.id) }, data: { isActive: true, status: 'PUBLISHED' } });
     await logAction(req.admin.id, 'APPROVE', 'products', req.params.id, {}, req.ip);
     res.json(product);
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -102,7 +102,7 @@ router.patch('/:id/approve', requireRole('MODERATEUR'), async (req, res) => {
 // PATCH /api/admin/products/:id/reject
 router.patch('/:id/reject', requireRole('MODERATEUR'), async (req, res) => {
   try {
-    const product = await prisma.product.update({ where: { id: parseInt(req.params.id) }, data: { isActive: false } });
+    const product = await prisma.product.update({ where: { id: parseInt(req.params.id) }, data: { isActive: false, status: 'REJECTED' } });
     await logAction(req.admin.id, 'REJECT', 'products', req.params.id, { reason: req.body.reason }, req.ip);
     res.json(product);
   } catch (e) { res.status(500).json({ error: e.message }); }

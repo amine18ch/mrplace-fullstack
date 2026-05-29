@@ -7,8 +7,8 @@ router.use(sellerAuth);
 
 const parseP = p => p ? {
   ...p,
-  images: typeof p.images === 'string' ? JSON.parse(p.images) : p.images || [],
-  tags:   typeof p.tags   === 'string' ? JSON.parse(p.tags)   : p.tags   || [],
+  images:         typeof p.images         === 'string' ? JSON.parse(p.images)         : p.images         || [],
+  tags:           typeof p.tags           === 'string' ? JSON.parse(p.tags)           : p.tags           || [],
   specifications: typeof p.specifications === 'string' ? JSON.parse(p.specifications) : p.specifications || {},
   variants:       typeof p.variants       === 'string' ? JSON.parse(p.variants)       : p.variants       || {},
 } : p;
@@ -20,11 +20,16 @@ router.get('/', async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const where = { sellerId: req.seller.id };
     if (search) where.OR = [{ title: { contains: search } }, { brand: { contains: search } }];
-    if (status === 'active')   where.isActive = true;
-    if (status === 'inactive') where.isActive = false;
+    if (status === 'active')   where.status = 'PUBLISHED';
+    if (status === 'inactive') where.status = 'PENDING';
+    if (status === 'draft')    where.status = 'DRAFT';
 
     const [products, total] = await Promise.all([
-      prisma.product.findMany({ where, skip, take: parseInt(limit), include: { category: true }, orderBy: { createdAt: 'desc' } }),
+      prisma.product.findMany({
+        where, skip, take: parseInt(limit),
+        include: { category: { include: { parent: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
       prisma.product.count({ where }),
     ]);
     res.json({ products: products.map(parseP), total, page: parseInt(page) });
@@ -36,88 +41,101 @@ router.get('/:id', async (req, res) => {
   try {
     const product = await prisma.product.findFirst({
       where: { id: parseInt(req.params.id), sellerId: req.seller.id },
-      include: { category: true },
+      include: { category: { include: { parent: true } } },
     });
     if (!product) return res.status(404).json({ error: 'Produit introuvable' });
     res.json(parseP(product));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/seller/products — ajouter un produit
+// POST /api/seller/products
 router.post('/', async (req, res) => {
   try {
     const {
-      title, brand, categoryId, subcategory, price, originalPrice,
+      title, brand, categoryId, sku, price, originalPrice,
       description, specifications, variants, images, stock,
-      warranty, returnPolicy, expressDelivery, freeDelivery, tags
+      warranty, returnPolicy, expressDelivery, freeDelivery, tags,
     } = req.body;
 
     if (!title || !price || !categoryId) return res.status(400).json({ error: 'Titre, prix et catégorie requis' });
 
-    const discount = originalPrice && originalPrice > price
-      ? Math.round((1 - price / originalPrice) * 100) : 0;
+    const discount = originalPrice && parseFloat(originalPrice) > parseFloat(price)
+      ? Math.round((1 - parseFloat(price) / parseFloat(originalPrice)) * 100) : 0;
 
     const product = await prisma.product.create({
       data: {
         title, brand: brand || req.seller.name,
         sellerId: req.seller.id,
         categoryId: parseInt(categoryId),
-        subcategory: subcategory || '',
+        subcategory: '',
+        sku: sku || null,
         price: parseFloat(price),
         originalPrice: parseFloat(originalPrice || price),
         discount,
         description: description || '',
         specifications: JSON.stringify(specifications || {}),
-        variants: JSON.stringify(variants || {}),
-        images: JSON.stringify(images || ['📦']),
-        tags: JSON.stringify(tags || []),
-        stock: parseInt(stock) || 100,
+        variants:       JSON.stringify(variants       || {}),
+        images:         JSON.stringify(images         || ['📦']),
+        tags:           JSON.stringify(tags           || []),
+        stock:    parseInt(stock) || 100,
         lowStock: parseInt(stock) < 10,
-        warranty: warranty || '1 an',
-        returnPolicy: returnPolicy || 'Retour 15 jours',
+        warranty:      warranty      || '1 an',
+        returnPolicy:  returnPolicy  || 'Retour 15 jours',
         expressDelivery: expressDelivery !== false,
-        freeDelivery: freeDelivery !== false,
-        isActive: false, // En attente de modération admin
+        freeDelivery:    freeDelivery    !== false,
+        isActive: false,
+        status: 'PENDING',
       },
-      include: { category: true },
+      include: { category: { include: { parent: true } } },
     });
-    // Mettre à jour le compteur de produits du vendeur
     await prisma.seller.update({ where: { id: req.seller.id }, data: { productsCount: { increment: 1 } } });
     res.json(parseP(product));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PUT /api/seller/products/:id — modifier un produit
+// PUT /api/seller/products/:id
 router.put('/:id', async (req, res) => {
   try {
-    const existing = await prisma.product.findFirst({ where: { id: parseInt(req.params.id), sellerId: req.seller.id } });
+    const existing = await prisma.product.findFirst({
+      where: { id: parseInt(req.params.id), sellerId: req.seller.id },
+    });
     if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
 
-    const { title, brand, categoryId, subcategory, price, originalPrice, description, specifications, variants, images, stock, warranty, returnPolicy, expressDelivery, freeDelivery, tags } = req.body;
-    const discount = originalPrice && parseFloat(originalPrice) > parseFloat(price || existing.price)
-      ? Math.round((1 - parseFloat(price || existing.price) / parseFloat(originalPrice)) * 100) : 0;
+    const {
+      title, brand, categoryId, sku, price, originalPrice,
+      description, specifications, variants, images, stock,
+      warranty, returnPolicy, expressDelivery, freeDelivery, tags,
+    } = req.body;
 
-    const data = {};
-    if (title)        data.title = title;
-    if (brand)        data.brand = brand;
-    if (categoryId)   data.categoryId = parseInt(categoryId);
-    if (subcategory !== undefined) data.subcategory = subcategory;
-    if (price)        { data.price = parseFloat(price); data.discount = discount; }
-    if (originalPrice) data.originalPrice = parseFloat(originalPrice);
-    if (description !== undefined) data.description = description;
-    if (specifications) data.specifications = JSON.stringify(specifications);
-    if (variants)     data.variants = JSON.stringify(variants);
-    if (images)       data.images = JSON.stringify(images);
-    if (tags)         data.tags = JSON.stringify(tags);
-    if (stock !== undefined) { data.stock = parseInt(stock); data.lowStock = parseInt(stock) < 10; }
-    if (warranty)     data.warranty = warranty;
-    if (returnPolicy) data.returnPolicy = returnPolicy;
-    if (expressDelivery !== undefined) data.expressDelivery = expressDelivery;
-    if (freeDelivery  !== undefined)   data.freeDelivery  = freeDelivery;
+    const newPrice    = price    ? parseFloat(price)    : existing.price;
+    const newOriginal = originalPrice ? parseFloat(originalPrice) : existing.originalPrice;
+    const discount    = newOriginal > newPrice ? Math.round((1 - newPrice / newOriginal) * 100) : 0;
+
+    const data = {
+      ...(title        !== undefined && { title }),
+      ...(brand        !== undefined && { brand }),
+      ...(categoryId   !== undefined && { categoryId: parseInt(categoryId), subcategory: '' }),
+      ...(sku          !== undefined && { sku: sku || null }),
+      ...(price        !== undefined && { price: newPrice, discount }),
+      ...(originalPrice !== undefined && { originalPrice: newOriginal }),
+      ...(description  !== undefined && { description }),
+      ...(specifications !== undefined && { specifications: JSON.stringify(specifications) }),
+      ...(variants     !== undefined && { variants: JSON.stringify(variants) }),
+      ...(images       !== undefined && { images: JSON.stringify(images) }),
+      ...(tags         !== undefined && { tags: JSON.stringify(tags) }),
+      ...(stock        !== undefined && { stock: parseInt(stock), lowStock: parseInt(stock) < 10 }),
+      ...(warranty     !== undefined && { warranty }),
+      ...(returnPolicy !== undefined && { returnPolicy }),
+      ...(expressDelivery !== undefined && { expressDelivery }),
+      ...(freeDelivery    !== undefined && { freeDelivery }),
+    };
     // Repasser en modération si changement de prix ou titre
-    if (title || price) data.isActive = false;
+    if (title || price) { data.isActive = false; data.status = 'PENDING'; }
 
-    const product = await prisma.product.update({ where: { id: parseInt(req.params.id) }, data, include: { category: true } });
+    const product = await prisma.product.update({
+      where: { id: parseInt(req.params.id) }, data,
+      include: { category: { include: { parent: true } } },
+    });
     res.json(parseP(product));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -125,9 +143,14 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/seller/products/:id
 router.delete('/:id', async (req, res) => {
   try {
-    const existing = await prisma.product.findFirst({ where: { id: parseInt(req.params.id), sellerId: req.seller.id } });
+    const existing = await prisma.product.findFirst({
+      where: { id: parseInt(req.params.id), sellerId: req.seller.id },
+    });
     if (!existing) return res.status(404).json({ error: 'Produit introuvable' });
-    await prisma.product.update({ where: { id: parseInt(req.params.id) }, data: { isActive: false } });
+    await prisma.product.update({
+      where: { id: parseInt(req.params.id) },
+      data: { isActive: false, status: 'DRAFT' },
+    });
     await prisma.seller.update({ where: { id: req.seller.id }, data: { productsCount: { decrement: 1 } } });
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }

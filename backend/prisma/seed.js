@@ -5,19 +5,93 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Categories
-  const categories = await Promise.all([
-    prisma.category.upsert({ where:{slug:'electronics'}, update:{}, create:{name:'Électronique',slug:'electronics',icon:'📱'} }),
-    prisma.category.upsert({ where:{slug:'fashion'}, update:{}, create:{name:'Mode',slug:'fashion',icon:'👕'} }),
-    prisma.category.upsert({ where:{slug:'home'}, update:{}, create:{name:'Maison & Cuisine',slug:'home',icon:'🛋️'} }),
-    prisma.category.upsert({ where:{slug:'beauty'}, update:{}, create:{name:'Beauté',slug:'beauty',icon:'💄'} }),
-    prisma.category.upsert({ where:{slug:'sports'}, update:{}, create:{name:'Sports',slug:'sports',icon:'⚽'} }),
-    prisma.category.upsert({ where:{slug:'toys'}, update:{}, create:{name:'Jouets & Bébé',slug:'toys',icon:'🧸'} }),
-    prisma.category.upsert({ where:{slug:'grocery'}, update:{}, create:{name:'Épicerie',slug:'grocery',icon:'🛒'} }),
-    prisma.category.upsert({ where:{slug:'auto'}, update:{}, create:{name:'Auto',slug:'auto',icon:'🚗'} }),
-  ]);
-  const catMap = Object.fromEntries(categories.map(c=>[c.slug,c.id]));
-  console.log('✅ Categories created');
+  // ── Catégories parentes (niveau 1)
+  const parentDefs = [
+    { slug:'phones',       name:'Téléphones & Tablettes', icon:'📱' },
+    { slug:'computers',    name:'Informatique',           icon:'💻' },
+    { slug:'electronics',  name:'Électronique TV & Audio',icon:'📺' },
+    { slug:'home',         name:'Maison & Mobilier',      icon:'🛋️' },
+    { slug:'appliances',   name:'Électroménager',         icon:'🍳' },
+    { slug:'fashion',      name:'Mode',                   icon:'👗' },
+    { slug:'beauty',       name:'Santé & Beauté',         icon:'💄' },
+    { slug:'toys',         name:'Produits Bébé',          icon:'🧸' },
+    { slug:'grocery',      name:'Supermarché',            icon:'🛒' },
+    { slug:'sports',       name:'Sports & Loisirs',       icon:'⚽' },
+    { slug:'auto',         name:'Auto & Moto',            icon:'🚗' },
+  ];
+  const parents = [];
+  for (const d of parentDefs) {
+    const c = await prisma.category.upsert({ where:{slug:d.slug}, update:{name:d.name,icon:d.icon}, create:{...d} });
+    parents.push(c);
+  }
+  const catMap = Object.fromEntries(parents.map(c=>[c.slug,c.id]));
+
+  // ── Sous-catégories (niveau 2)
+  const subDefs = [
+    // Téléphones & Tablettes
+    { slug:'mobile-phones',    name:'Téléphones mobiles',     icon:'📱', parent:'phones' },
+    { slug:'tablets',          name:'Tablettes',               icon:'📟', parent:'phones' },
+    { slug:'phone-accessories',name:'Accessoires téléphones',  icon:'🎧', parent:'phones' },
+    { slug:'smartwatches',     name:'Smartwatches',            icon:'⌚', parent:'phones' },
+    // Informatique
+    { slug:'laptops',          name:'Ordinateurs portables',   icon:'💻', parent:'computers' },
+    { slug:'desktops',         name:'Ordinateurs de bureau',   icon:'🖥️', parent:'computers' },
+    { slug:'pc-components',    name:'Composants PC',           icon:'🔧', parent:'computers' },
+    { slug:'printers',         name:'Imprimantes',             icon:'🖨️', parent:'computers' },
+    { slug:'it-accessories',   name:'Accessoires informatique',icon:'🖱️', parent:'computers' },
+    // Électronique
+    { slug:'tvs',              name:'Télévisions',             icon:'📺', parent:'electronics' },
+    { slug:'audio',            name:'Audio & Sono',            icon:'🔊', parent:'electronics' },
+    { slug:'cameras',          name:'Appareils photo',         icon:'📷', parent:'electronics' },
+    { slug:'gaming',           name:'Jeux vidéo & Consoles',   icon:'🎮', parent:'electronics' },
+    // Maison
+    { slug:'furniture',        name:'Meubles',                 icon:'🪑', parent:'home' },
+    { slug:'decoration',       name:'Décoration',              icon:'🏮', parent:'home' },
+    { slug:'kitchen',          name:'Cuisine & Art de table',  icon:'🍴', parent:'home' },
+    { slug:'bathroom',         name:'Salle de bain',           icon:'🚿', parent:'home' },
+    { slug:'tools',            name:'Bricolage & Outils',      icon:'🔨', parent:'home' },
+    // Électroménager
+    { slug:'large-appliances', name:'Gros électroménager',     icon:'🧺', parent:'appliances' },
+    { slug:'small-appliances', name:'Petit électroménager',    icon:'☕', parent:'appliances' },
+    { slug:'climate',          name:'Climatisation & Chauffage',icon:'❄️', parent:'appliances' },
+    // Mode
+    { slug:'mens-clothing',    name:'Vêtements homme',         icon:'👔', parent:'fashion' },
+    { slug:'womens-clothing',  name:'Vêtements femme',         icon:'👗', parent:'fashion' },
+    { slug:'shoes',            name:'Chaussures',              icon:'👟', parent:'fashion' },
+    { slug:'bags',             name:'Sacs & Accessoires',      icon:'👜', parent:'fashion' },
+    { slug:'jewelry',          name:'Bijoux & Montres',        icon:'💍', parent:'fashion' },
+    // Santé & Beauté
+    { slug:'skincare',         name:'Soin visage & Corps',     icon:'🧴', parent:'beauty' },
+    { slug:'makeup',           name:'Maquillage',              icon:'💋', parent:'beauty' },
+    { slug:'perfumes',         name:'Parfums',                 icon:'🌸', parent:'beauty' },
+    { slug:'health',           name:'Santé & Bien-être',       icon:'💊', parent:'beauty' },
+    // Bébé
+    { slug:'baby-gear',        name:'Puériculture',            icon:'🍼', parent:'toys' },
+    { slug:'baby-toys',        name:'Jouets',                  icon:'🧸', parent:'toys' },
+    { slug:'baby-clothing',    name:'Vêtements bébé',          icon:'👶', parent:'toys' },
+    { slug:'baby-food',        name:'Alimentation bébé',       icon:'🥣', parent:'toys' },
+    // Supermarché
+    { slug:'food',             name:'Épicerie & Conserves',    icon:'🥫', parent:'grocery' },
+    { slug:'drinks',           name:'Boissons',                icon:'🥤', parent:'grocery' },
+    { slug:'hygiene',          name:'Hygiène & Entretien',     icon:'🧹', parent:'grocery' },
+    // Sports
+    { slug:'fitness',          name:'Fitness & Musculation',   icon:'🏋️', parent:'sports' },
+    { slug:'team-sports',      name:'Sports collectifs',       icon:'⚽', parent:'sports' },
+    { slug:'outdoor',          name:'Camping & Plein air',     icon:'⛺', parent:'sports' },
+    { slug:'cycling',          name:'Vélo & Trottinette',      icon:'🚴', parent:'sports' },
+    // Auto
+    { slug:'car-parts',        name:'Pièces auto',             icon:'⚙️', parent:'auto' },
+    { slug:'car-accessories',  name:'Accessoires auto',        icon:'🪄', parent:'auto' },
+    { slug:'moto',             name:'Moto & Scooter',          icon:'🏍️', parent:'auto' },
+  ];
+  for (const d of subDefs) {
+    await prisma.category.upsert({
+      where: { slug: d.slug },
+      update: { name:d.name, icon:d.icon, parentId: catMap[d.parent] },
+      create: { name:d.name, slug:d.slug, icon:d.icon, parentId: catMap[d.parent] },
+    });
+  }
+  console.log('✅ Categories + subcategories created');
 
   // Sellers
   const sellers = await Promise.all([
