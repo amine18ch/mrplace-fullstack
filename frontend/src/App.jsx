@@ -1,7 +1,7 @@
 import AdminApp from './admin/AdminApp';
 import SellerApp from './seller/SellerApp';
 import { AppProvider, useApp } from './context/AppContext';
-import { TopBar, Header, CategoryBar, Footer, Toasts, LoginModal } from './components/Layout';
+import { TopBar, Header, CategoryBar, Footer, Toasts, LoginModal, MobileBottomNav } from './components/Layout';
 import HomePage from './pages/HomePage';
 import CategoryPage from './pages/CategoryPage';
 import ProductPage from './pages/ProductPage';
@@ -32,13 +32,20 @@ const AppInner = () => (
   <div className="min-h-screen flex flex-col" style={{ background: '#F1F5F9' }}>
     <TopBar />
     <Header />
-    <CategoryBar />
-    <main className="flex-1">
+    {/* CategoryBar masquée sur mobile — remplacée par bottom nav */}
+    <div className="hidden sm:block">
+      <CategoryBar />
+    </div>
+    <main className="flex-1 pb-16 sm:pb-0">
       <Router />
     </main>
-    <Footer />
+    <div className="hidden sm:block">
+      <Footer />
+    </div>
     <LoginModal />
     <Toasts />
+    {/* Navigation bottom mobile */}
+    <MobileBottomNav />
   </div>
 );
 

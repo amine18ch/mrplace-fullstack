@@ -143,83 +143,173 @@ export const TopBar = () => (
 export const Header = () => {
   const { cart, cartCount, wishlist, navigate, setLoginOpen, user, logout, miniCartOpen, setMiniCartOpen } = useApp();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSearch, setMobileSearch] = useState(false);
 
   return (
-    <header className="gradient-header text-white sticky top-0 z-40 shadow-lg">
-      <div className="max-w-[1400px] mx-auto px-4 h-20 flex items-center gap-4">
-        <div onClick={() => navigate('home')} className="flex items-center gap-1 cursor-pointer shrink-0">
-          <span className="text-3xl font-extrabold tracking-tight text-shadow">MARKET</span>
-          <span className="w-3 h-3 rounded-full bg-blue-300 anim-pulse" />
-        </div>
-        <div className="hidden lg:flex items-center gap-1 text-sm cursor-pointer hover:bg-white/10 px-3 py-2 rounded-lg transition shrink-0">
-          <Icon name="pin" size={18} />
-          <div>
-            <div className="text-[10px] opacity-80">Livrer à</div>
-            <div className="font-semibold flex items-center gap-1">Tunis <Icon name="chevD" size={14} /></div>
+    <>
+      <header className="gradient-header text-white sticky top-0 z-40 shadow-lg">
+        {/* Desktop header */}
+        <div className="max-w-[1400px] mx-auto px-4 h-16 md:h-20 flex items-center gap-3">
+          {/* Logo */}
+          <div onClick={() => navigate('home')} className="flex items-center gap-1 cursor-pointer shrink-0">
+            <span className="text-2xl md:text-3xl font-extrabold tracking-tight text-shadow">MARKET</span>
+            <span className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-blue-300 anim-pulse" />
           </div>
-        </div>
 
-        <SearchBar />
-
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Account */}
-          <div className="relative">
-            <div onClick={() => user ? setUserMenuOpen(!userMenuOpen) : setLoginOpen(true)}
-              className="hidden md:flex items-center gap-2 hover:bg-white/10 px-3 py-2 rounded-lg cursor-pointer transition text-sm">
-              <Icon name="user" size={20} />
-              <div>
-                <div className="text-[10px] opacity-80">Bonjour, {user ? user.name.split(' ')[0] : 'Connectez-vous'}</div>
-                <div className="font-semibold">Compte</div>
-              </div>
+          {/* Location — desktop only */}
+          <div className="hidden lg:flex items-center gap-1 text-sm cursor-pointer hover:bg-white/10 px-3 py-2 rounded-lg transition shrink-0">
+            <Icon name="pin" size={18} />
+            <div>
+              <div className="text-[10px] opacity-80">Livrer à</div>
+              <div className="font-semibold flex items-center gap-1">Tunis <Icon name="chevD" size={14} /></div>
             </div>
-            {userMenuOpen && user && (
-              <div className="absolute top-full right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 w-48 z-50 overflow-hidden anim-fadeIn">
-                {[
-                  { label: 'Mon compte', page: 'account' },
-                  { label: 'Mes commandes', page: 'orders' },
-                  { label: 'Ma wishlist', page: 'wishlist' },
-                ].map(item => (
-                  <div key={item.label}
-                    onClick={() => { navigate(item.page); setUserMenuOpen(false); }}
-                    className="px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 cursor-pointer border-b last:border-0">
-                    {item.label}
-                  </div>
-                ))}
-                <div onClick={() => { logout(); setUserMenuOpen(false); }}
-                  className="px-4 py-3 text-sm text-red-500 hover:bg-red-50 cursor-pointer font-semibold">
-                  Déconnexion
+          </div>
+
+          {/* Search — hidden on mobile, shown on tablet+ */}
+          <div className="hidden sm:flex flex-1 min-w-0">
+            <SearchBar />
+          </div>
+
+          {/* Mobile: search icon */}
+          <button onClick={() => setMobileSearch(true)} className="sm:hidden p-2 hover:bg-white/10 rounded-lg transition">
+            <Icon name="search" size={22} />
+          </button>
+
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Account — desktop */}
+            <div className="relative hidden md:block">
+              <div onClick={() => user ? setUserMenuOpen(!userMenuOpen) : setLoginOpen(true)}
+                className="flex items-center gap-2 hover:bg-white/10 px-3 py-2 rounded-lg cursor-pointer transition text-sm">
+                <Icon name="user" size={20} />
+                <div>
+                  <div className="text-[10px] opacity-80">Bonjour, {user ? user.name.split(' ')[0] : 'Connectez-vous'}</div>
+                  <div className="font-semibold">Compte</div>
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Wishlist */}
-          <div onClick={() => navigate('wishlist')} className="relative hover:bg-white/10 p-2 rounded-lg cursor-pointer transition">
-            <Icon name="heart" size={24} />
-            {wishlist.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                {wishlist.length}
-              </span>
-            )}
-          </div>
-
-          {/* Cart */}
-          <div className="relative" onMouseEnter={() => setMiniCartOpen(true)} onMouseLeave={() => setMiniCartOpen(false)}>
-            <div onClick={() => navigate('cart')}
-              className="relative hover:bg-white/10 p-2 rounded-lg cursor-pointer transition flex items-center gap-2">
-              <Icon name="cart" size={24} />
-              {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center anim-pulse">
-                  {cartCount}
-                </span>
+              {userMenuOpen && user && (
+                <div className="absolute top-full right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 w-48 z-50 overflow-hidden anim-fadeIn">
+                  {[{ label:'Mon compte', page:'account' }, { label:'Mes commandes', page:'orders' }, { label:'Ma wishlist', page:'wishlist' }].map(item => (
+                    <div key={item.label} onClick={() => { navigate(item.page); setUserMenuOpen(false); }}
+                      className="px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 cursor-pointer border-b last:border-0">
+                      {item.label}
+                    </div>
+                  ))}
+                  <div onClick={() => { logout(); setUserMenuOpen(false); }}
+                    className="px-4 py-3 text-sm text-red-500 hover:bg-red-50 cursor-pointer font-semibold">
+                    Déconnexion
+                  </div>
+                </div>
               )}
-              <span className="hidden md:inline text-sm font-semibold">Panier</span>
             </div>
-            {miniCartOpen && <MiniCart />}
+
+            {/* Wishlist */}
+            <div onClick={() => navigate('wishlist')} className="relative hover:bg-white/10 p-2 rounded-lg cursor-pointer transition hidden sm:block">
+              <Icon name="heart" size={22} />
+              {wishlist.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{wishlist.length}</span>
+              )}
+            </div>
+
+            {/* Cart */}
+            <div className="relative" onMouseEnter={() => setMiniCartOpen(true)} onMouseLeave={() => setMiniCartOpen(false)}>
+              <div onClick={() => navigate('cart')} className="relative hover:bg-white/10 p-2 rounded-lg cursor-pointer transition flex items-center gap-1.5">
+                <Icon name="cart" size={22} />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center anim-pulse">{cartCount}</span>
+                )}
+                <span className="hidden md:inline text-sm font-semibold">Panier</span>
+              </div>
+              {miniCartOpen && <MiniCart />}
+            </div>
+
+            {/* Burger mobile */}
+            <button onClick={() => setMobileMenuOpen(true)} className="md:hidden p-2 hover:bg-white/10 rounded-lg transition">
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            </button>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Mobile search overlay */}
+      {mobileSearch && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col sm:hidden">
+          <div className="flex items-center gap-2 p-3 border-b border-gray-200">
+            <button onClick={() => setMobileSearch(false)} className="p-2 text-slate-500">
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            </button>
+            <div className="flex-1">
+              <SearchBar onSubmit={() => setMobileSearch(false)} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile menu drawer */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileMenuOpen(false)} />
+          <div className="absolute right-0 top-0 bottom-0 w-80 bg-white flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 gradient-header text-white">
+              <span className="font-bold text-lg">MARKET</span>
+              <button onClick={() => setMobileMenuOpen(false)} className="p-1.5 hover:bg-white/20 rounded">
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            {/* User */}
+            {user ? (
+              <div className="p-4 bg-blue-50 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">{user.name[0]}</div>
+                  <div>
+                    <div className="font-semibold text-slate-800">{user.name}</div>
+                    <div className="text-xs text-slate-500">{user.email}</div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 border-b border-gray-200">
+                <button onClick={() => { setLoginOpen(true); setMobileMenuOpen(false); }}
+                  className="w-full py-3 bg-blue-600 text-white rounded-full font-bold text-sm hover:bg-blue-700">
+                  Se connecter / S'inscrire
+                </button>
+              </div>
+            )}
+
+            {/* Nav links */}
+            <div className="flex-1 overflow-y-auto py-2">
+              {[
+                { label:'Accueil', page:'home', icon:'🏠' },
+                { label:'Mes commandes', page:'orders', icon:'📦' },
+                { label:'Ma wishlist', page:'wishlist', icon:'❤️' },
+                { label:'Messages', page:'messages', icon:'💬' },
+                { label:'Mon compte', page:'account', icon:'👤' },
+              ].map(item => (
+                <button key={item.page} onClick={() => { navigate(item.page); setMobileMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-5 py-3.5 text-slate-700 hover:bg-blue-50 transition text-left border-b border-gray-100 last:border-0">
+                  <span className="text-xl">{item.icon}</span>
+                  <span className="font-medium">{item.label}</span>
+                </button>
+              ))}
+              <a href="/seller" className="w-full flex items-center gap-3 px-5 py-3.5 text-slate-700 hover:bg-blue-50 transition border-b border-gray-100">
+                <span className="text-xl">🏪</span>
+                <span className="font-medium">Espace vendeur</span>
+              </a>
+            </div>
+
+            {user && (
+              <div className="p-4 border-t border-gray-200">
+                <button onClick={() => { logout(); setMobileMenuOpen(false); }}
+                  className="w-full py-3 border border-red-300 text-red-500 rounded-full font-bold text-sm hover:bg-red-50">
+                  Déconnexion
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
@@ -365,6 +455,43 @@ const CatItem = ({ cat, navigate }) => {
         </div>
       )}
     </div>
+  );
+};
+
+// ── Mobile Bottom Navigation (visible sur sm et moins)
+export const MobileBottomNav = () => {
+  const { navigate, currentPage, cartCount, setLoginOpen, user } = useApp();
+  const items = [
+    { page:'home',     label:'Accueil',     icon:'M3 12L12 3l9 9M5 10v10h14V10' },
+    { page:'category', label:'Catégories',  icon:'M4 6h16M4 12h16M4 18h16' },
+    { page:'cart',     label:'Panier',      icon:'M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0', badge: cartCount },
+    { page:'orders',   label:'Commandes',   icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2' },
+    { page:'account',  label:'Compte',      icon:'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8' },
+  ];
+  return (
+    <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 shadow-2xl" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+      <div className="flex items-stretch h-16">
+        {items.map(item => {
+          const active = currentPage === item.page;
+          return (
+            <button key={item.page}
+              onClick={() => item.page === 'account' && !user ? setLoginOpen(true) : navigate(item.page)}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-colors ${active ? 'text-blue-600' : 'text-gray-400'}`}>
+              <div className="relative">
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+                  <path d={item.icon} />
+                </svg>
+                {item.badge > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{item.badge}</span>
+                )}
+              </div>
+              <span className={`text-[10px] font-medium leading-none ${active ? 'text-blue-600' : 'text-gray-400'}`}>{item.label}</span>
+              {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 };
 
