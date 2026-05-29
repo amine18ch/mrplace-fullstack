@@ -44,10 +44,11 @@ router.get('/', async (req, res) => {
     }
     if (brand) where.brand = { in: brand.split(',') };
     if (sellerId) where.sellerId = parseInt(sellerId);
+    // SQLite: contains maps to LIKE (case-insensitive for ASCII natively — no mode needed)
     if (search) where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { brand: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
+      { title: { contains: search } },
+      { brand: { contains: search } },
+      { description: { contains: search } },
     ];
     if (minPrice || maxPrice) where.price = {};
     if (minPrice) where.price.gte = parseFloat(minPrice);
@@ -56,7 +57,7 @@ router.get('/', async (req, res) => {
     if (minDiscount) where.discount = { gte: parseInt(minDiscount) };
     if (express === 'true') where.expressDelivery = true;
     if (inStock === 'true') where.stock = { gt: 0 };
-    if (tags) where.tags = { hasSome: tags.split(',') };
+    // tags: hasSome non supporté SQLite — ignoré
 
     const orderBy = {
       popular: { soldCount: 'desc' },
@@ -91,8 +92,8 @@ router.get('/search/suggestions', async (req, res) => {
   const where = {
     isActive: true,
     OR: [
-      { title: { contains: q, mode: 'insensitive' } },
-      { brand: { contains: q, mode: 'insensitive' } },
+      { title: { contains: q } },
+      { brand: { contains: q } },
     ],
   };
   if (cat && cat !== 'all') where.category = { slug: cat };

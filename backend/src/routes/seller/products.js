@@ -129,8 +129,10 @@ router.put('/:id', async (req, res) => {
       ...(expressDelivery !== undefined && { expressDelivery }),
       ...(freeDelivery    !== undefined && { freeDelivery }),
     };
-    // Repasser en modération si changement de prix ou titre
-    if (title || price) { data.isActive = false; data.status = 'PENDING'; }
+    // Repasser en modération UNIQUEMENT si le titre ou le prix change
+    // Un changement de catégorie/SKU/stock/description ne remet PAS en modération
+    const needsReview = (title && title !== existing.title) || (price && Math.abs(parseFloat(price) - existing.price) > 0.001);
+    if (needsReview) { data.isActive = false; data.status = 'PENDING'; }
 
     const product = await prisma.product.update({
       where: { id: parseInt(req.params.id) }, data,
