@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { productsApi, sellersApi, categoriesApi } from '../api/client';
+import { productsApi, sellersApi } from '../api/client';
 import { useApp } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
 import { fmt, SkeletonCard } from '../components/ui';
@@ -69,11 +69,10 @@ const HeroBanner = () => {
 };
 
 const HomePage = () => {
-  const { navigate, recentlyViewed } = useApp();
+  const { navigate, recentlyViewed, categories: cats } = useApp();
   const [flash, setFlash]       = useState([]);
   const [trending, setTrending] = useState([]);
   const [sellers, setSellers]   = useState([]);
-  const [cats, setCats]         = useState([]);
   const [loading, setLoading]   = useState(true);
   const [flashTime, setFlashTime] = useState({ h:5, m:12, s:30 });
 
@@ -88,16 +87,14 @@ const HomePage = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [fp, tp, sp, cs] = await Promise.all([
+      const [fp, tp, sp] = await Promise.all([
         productsApi.list({ sort:'discount', limit:10 }),
         productsApi.list({ sort:'popular', limit:8 }),
         sellersApi.list(),
-        categoriesApi.list(),
       ]);
       setFlash(fp.products);
       setTrending(tp.products);
       setSellers(sp);
-      setCats(cs);
       setLoading(false);
     };
     load().catch(console.error);

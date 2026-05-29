@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { cartApi, wishlistApi, authApi, getToken, setToken, removeToken } from '../api/client';
+import { cartApi, wishlistApi, authApi, categoriesApi, getToken, setToken, removeToken } from '../api/client';
 
 const AppCtx = createContext(null);
 export const useApp = () => useContext(AppCtx);
@@ -16,6 +16,7 @@ export const AppProvider = ({ children }) => {
   const [miniCartOpen, setMiniCartOpen] = useState(false);
   const [loginOpen, setLoginOpen]   = useState(false);
   const [loadingCart, setLoadingCart] = useState(false);
+  const [categories, setCategories] = useState([]);
 
   // ── Navigation
   const navigate = (page, params = {}) => {
@@ -58,6 +59,8 @@ export const AppProvider = ({ children }) => {
 
   // ── Bootstrap
   useEffect(() => {
+    // Charger les catégories en premier (pas besoin d'authentification)
+    categoriesApi.list().then(setCategories).catch(() => {});
     const init = async () => {
       if (getToken()) {
         try {
@@ -154,6 +157,7 @@ export const AppProvider = ({ children }) => {
       recentlyViewed, addToRecently,
       promoCode, setPromoCode, applyPromo,
       miniCartOpen, setMiniCartOpen,
+      categories,
     }}>
       {children}
     </AppCtx.Provider>

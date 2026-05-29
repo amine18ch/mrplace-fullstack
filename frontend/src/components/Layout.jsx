@@ -1,30 +1,19 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { productsApi, categoriesApi } from '../api/client';
+import { productsApi } from '../api/client';
 import { fmt } from './ui';
 import Icon from './Icon';
 
-// Cache global des catégories pour éviter les rechargements
-let _catCache = null;
-const getCats = async () => {
-  if (_catCache) return _catCache;
-  _catCache = await categoriesApi.list();
-  return _catCache;
-};
+// Les catégories sont chargées dans AppContext — plus besoin de fetch local
 
 // ── Search Bar
-const SearchBar = () => {
-  const { navigate } = useApp();
+const SearchBar = ({ onSubmit }) => {
+  const { navigate, categories } = useApp();
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('all');
   const [focused, setFocused] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
-  const [cats, setCats] = useState([]);
   const timer = useRef(null);
-
-  useEffect(() => {
-    getCats().then(setCats).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -36,7 +25,7 @@ const SearchBar = () => {
   }, [q, cat]);
 
   const submit = () => {
-    if (q.trim()) { navigate('search', { query: q }); setFocused(false); }
+    if (q.trim()) { navigate('search', { query: q }); setFocused(false); onSubmit?.(); }
   };
 
   return (
@@ -45,7 +34,7 @@ const SearchBar = () => {
         <select value={cat} onChange={e => setCat(e.target.value)}
           className="bg-gray-50 text-sm font-medium text-slate-700 px-3 py-3 border-r border-gray-200 outline-none cursor-pointer">
           <option value="all">Tout</option>
-          {cats.map(c => <option key={c.slug} value={c.slug}>{c.icon} {c.name}</option>)}
+          {categories.map(c => <option key={c.slug} value={c.slug}>{c.icon} {c.name}</option>)}
         </select>
         <input value={q} onChange={e => setQ(e.target.value)}
           onFocus={() => setFocused(true)}
@@ -313,44 +302,37 @@ export const Header = () => {
   );
 };
 
-// ── Category Bar avec mega-menu dynamique
+// ── Category Bar
 export const CategoryBar = () => {
-  const { navigate } = useApp();
-  const [cats, setCats]         = useState([]);
+  const { navigate, categories: cats } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const [hovered, setHovered]   = useState(null);
   const menuRef = useRef(null);
 
   useEffect(() => {
-    getCats().then(tree => {
-      setCats(tree);
-      if (tree.length) setHovered(tree[0]);
-    }).catch(() => {});
-  }, []);
+    if (cats.length && !hovered) setHovered(cats[0]);
+  }, [cats]);
 
   const closeMenu = () => { setMenuOpen(false); };
 
   return (
     <div className="bg-white border-b border-gray-200 shadow-sm relative z-40">
-      {/* overflow-visible ici pour que les dropdowns ne soient pas coupés */}
-      <div className="max-w-[1400px] mx-auto px-4 h-12 flex items-center gap-1" style={{ overflowX: 'visible', overflowY: 'visible' }}>
+      <div className="max-w-[1400px] mx-auto px-4 h-12 flex items-center gap-1" style={{ overflow: 'visible' }}>
 
         {/* Bouton "Toutes catégories" */}
         <div ref={menuRef} className="relative flex-shrink-0">
           <button
-            onMouseEnter={() => { setMenuOpen(true); if (cats.length) setHovered(cats[0]); }}
+            onMouseEnter={() => { setMenuOpen(true); if (cats.length && !hovered) setHovered(cats[0]); }}
             onClick={() => setMenuOpen(o => !o)}
             className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition whitespace-nowrap">
             <Icon name="menu" size={16} />Catégories<Icon name="chevD" size={14} />
           </button>
 
-          {/* Mega-menu */}
           {menuOpen && (
             <div
               className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 flex anim-fadeIn"
               style={{ width: 560 }}
               onMouseLeave={closeMenu}>
-              {/* Colonne gauche — catégories parentes */}
               <div className="w-52 border-r border-gray-100 py-2 overflow-y-auto" style={{ maxHeight: 420 }}>
                 {cats.map(c => (
                   <div key={c.id}
@@ -363,8 +345,6 @@ export const CategoryBar = () => {
                   </div>
                 ))}
               </div>
-
-              {/* Colonne droite — sous-catégories */}
               <div className="flex-1 p-4 overflow-y-auto" style={{ maxHeight: 420 }}>
                 {hovered && (
                   <>
@@ -376,7 +356,7 @@ export const CategoryBar = () => {
                           className="text-xs text-blue-600 hover:underline">Voir tout →</button>
                       </div>
                     </div>
-                    {hovered.children?.length > 0 ? (
+                    {hovered.children?.length > 0 && (
                       <div className="grid grid-cols-2 gap-1">
                         {hovered.children.map(sub => (
                           <div key={sub.id}
@@ -387,8 +367,6 @@ export const CategoryBar = () => {
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <div className="text-sm text-gray-400">Pas de sous-catégories</div>
                     )}
                   </>
                 )}
@@ -397,7 +375,7 @@ export const CategoryBar = () => {
           )}
         </div>
 
-        {/* Raccourcis horizontaux avec sous-catégories au survol */}
+        {/* Raccourcis avec dropdowns (desktop seulement — hover ne fonctionne pas sur iOS) */}
         {cats.map(c => (
           <CatItem key={c.slug} cat={c} navigate={navigate} />
         ))}
@@ -458,40 +436,119 @@ const CatItem = ({ cat, navigate }) => {
   );
 };
 
-// ── Mobile Bottom Navigation (visible sur sm et moins)
+// ── Categories Sheet (mobile)
+const CategoriesSheet = ({ onClose, navigate }) => {
+  const { categories } = useApp();
+  const [expanded, setExpanded] = useState(null);
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end sm:hidden">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-t-3xl max-h-[85vh] flex flex-col shadow-2xl">
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+          <span className="font-bold text-slate-800 text-lg">Catégories</span>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-700">
+            <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 py-2">
+          {categories.map(cat => (
+            <div key={cat.id}>
+              <button
+                onClick={() => {
+                  if (cat.children?.length) {
+                    setExpanded(expanded === cat.id ? null : cat.id);
+                  } else {
+                    navigate('category', { slug: cat.slug }); onClose();
+                  }
+                }}
+                className="w-full flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition active:bg-gray-100">
+                <span className="text-2xl w-8 text-center flex-shrink-0">{cat.icon}</span>
+                <span className="flex-1 text-left font-semibold text-slate-700">{cat.name}</span>
+                {cat.children?.length > 0 && (
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={`text-gray-400 transition-transform ${expanded === cat.id ? 'rotate-180' : ''}`}>
+                    <path d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
+              </button>
+              {/* Sous-catégories */}
+              {expanded === cat.id && cat.children?.length > 0 && (
+                <div className="bg-gray-50 border-y border-gray-100">
+                  <button onClick={() => { navigate('category', { slug: cat.slug }); onClose(); }}
+                    className="w-full flex items-center gap-4 px-5 py-3 text-blue-600 border-b border-gray-100">
+                    <span className="w-8" />
+                    <span className="text-sm font-bold">Tout — {cat.name} →</span>
+                  </button>
+                  {cat.children.map(sub => (
+                    <button key={sub.id}
+                      onClick={() => { navigate('category', { slug: sub.slug }); onClose(); }}
+                      className="w-full flex items-center gap-4 px-5 py-3 hover:bg-blue-50 transition active:bg-blue-100">
+                      <span className="text-xl w-8 text-center flex-shrink-0">{sub.icon}</span>
+                      <span className="text-sm text-slate-600 text-left">{sub.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Mobile Bottom Navigation
 export const MobileBottomNav = () => {
   const { navigate, currentPage, cartCount, setLoginOpen, user } = useApp();
-  const items = [
-    { page:'home',     label:'Accueil',     icon:'M3 12L12 3l9 9M5 10v10h14V10' },
-    { page:'category', label:'Catégories',  icon:'M4 6h16M4 12h16M4 18h16' },
-    { page:'cart',     label:'Panier',      icon:'M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0', badge: cartCount },
-    { page:'orders',   label:'Commandes',   icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2' },
-    { page:'account',  label:'Compte',      icon:'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8' },
+  const [catSheetOpen, setCatSheetOpen] = useState(false);
+
+  const NAV = [
+    { key:'home',    label:'Accueil',    icon:'M3 12L12 3l9 9M5 10v10h14V10' },
+    { key:'cats',    label:'Catégories', icon:'M4 6h16M4 12h16M4 18h16' },
+    { key:'cart',    label:'Panier',     icon:'M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18M16 10a4 4 0 01-8 0', badge: cartCount },
+    { key:'orders',  label:'Commandes',  icon:'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2' },
+    { key:'account', label:'Compte',     icon:'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8' },
   ];
+
+  const handleTap = (key) => {
+    if (key === 'cats') { setCatSheetOpen(true); return; }
+    if (key === 'account' && !user) { setLoginOpen(true); return; }
+    navigate(key);
+  };
+
   return (
-    <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 shadow-2xl" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="flex items-stretch h-16">
-        {items.map(item => {
-          const active = currentPage === item.page;
-          return (
-            <button key={item.page}
-              onClick={() => item.page === 'account' && !user ? setLoginOpen(true) : navigate(item.page)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative transition-colors ${active ? 'text-blue-600' : 'text-gray-400'}`}>
-              <div className="relative">
-                <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-                  <path d={item.icon} />
-                </svg>
-                {item.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{item.badge}</span>
-                )}
-              </div>
-              <span className={`text-[10px] font-medium leading-none ${active ? 'text-blue-600' : 'text-gray-400'}`}>{item.label}</span>
-              {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-blue-600 rounded-full" />}
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+    <>
+      {catSheetOpen && <CategoriesSheet onClose={() => setCatSheetOpen(false)} navigate={navigate} />}
+
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-40"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)', boxShadow: '0 -2px 20px rgba(0,0,0,0.08)' }}>
+        <div className="flex items-stretch h-[60px]">
+          {NAV.map(item => {
+            const active = currentPage === item.key;
+            return (
+              <button key={item.key}
+                onClick={() => handleTap(item.key)}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 relative ${active ? 'text-blue-600' : 'text-gray-400'}`}>
+                {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-0.5 bg-blue-600 rounded-full" />}
+                <div className="relative">
+                  <svg width={21} height={21} viewBox="0 0 24 24" fill={active ? 'none' : 'none'} stroke="currentColor"
+                    strokeWidth={active ? 2.3 : 1.7} strokeLinecap="round" strokeLinejoin="round">
+                    <path d={item.icon} />
+                  </svg>
+                  {item.badge > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-orange-500 text-white text-[9px] font-bold rounded-full min-w-[14px] h-3.5 px-0.5 flex items-center justify-center">{item.badge}</span>
+                  )}
+                </div>
+                <span className={`text-[9px] font-medium leading-tight mt-0.5 ${active ? 'text-blue-600' : 'text-gray-400'}`}>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+    </>
   );
 };
 
