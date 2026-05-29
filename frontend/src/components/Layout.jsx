@@ -306,14 +306,51 @@ export const CategoryBar = () => {
           )}
         </div>
 
-        {/* Raccourcis horizontaux — catégories principales */}
-        {cats.slice(0, 8).map(c => (
-          <button key={c.slug} onClick={() => navigate('category', { slug: c.slug })}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-full transition whitespace-nowrap flex-shrink-0">
-            <span>{c.icon}</span>{c.name}
-          </button>
+        {/* Raccourcis horizontaux avec sous-catégories au survol */}
+        {cats.map(c => (
+          <CatItem key={c.slug} cat={c} navigate={navigate} />
         ))}
       </div>
+    </div>
+  );
+};
+
+const CatItem = ({ cat, navigate }) => {
+  const [open, setOpen] = useState(false);
+  let timer = null;
+
+  const show = () => { clearTimeout(timer); setOpen(true); };
+  const hide = () => { timer = setTimeout(() => setOpen(false), 150); };
+
+  return (
+    <div className="relative flex-shrink-0" onMouseEnter={show} onMouseLeave={hide}>
+      <button
+        onClick={() => navigate('category', { slug: cat.slug })}
+        className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-full transition whitespace-nowrap ${open ? 'bg-blue-50 text-blue-600' : 'text-slate-700 hover:text-blue-600 hover:bg-blue-50'}`}>
+        <span>{cat.icon}</span>
+        <span>{cat.name}</span>
+        {cat.children?.length > 0 && <Icon name="chevD" size={12} className="opacity-50" />}
+      </button>
+
+      {open && cat.children?.length > 0 && (
+        <div className="absolute top-full left-0 mt-0 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 py-2 anim-fadeIn"
+          style={{ minWidth: 220 }}>
+          <div className="px-4 py-1.5 mb-1 border-b border-gray-100">
+            <button onClick={() => { navigate('category', { slug: cat.slug }); setOpen(false); }}
+              className="text-xs font-bold text-blue-600 hover:underline">
+              {cat.icon} Tout — {cat.name}
+            </button>
+          </div>
+          {cat.children.map(sub => (
+            <button key={sub.id}
+              onClick={() => { navigate('category', { slug: sub.slug }); setOpen(false); }}
+              className="w-full flex items-center gap-3 px-4 py-2 hover:bg-blue-50 transition text-left group">
+              <span className="text-lg flex-shrink-0">{sub.icon}</span>
+              <span className="text-sm text-slate-700 group-hover:text-blue-600">{sub.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
