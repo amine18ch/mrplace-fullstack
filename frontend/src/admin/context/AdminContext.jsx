@@ -9,33 +9,38 @@ export const useAdmin = () => {
   return ctx;
 };
 
-const PERMISSIONS = {
+// Permissions de base par rôle (peuvent être étendues par permissions individuelles)
+export const ROLE_DEFAULT_PERMISSIONS = {
   MODERATEUR: [
+    'dashboard.read',
     'vendors.read', 'vendors.write',
     'products.read', 'products.write',
     'orders.read', 'orders.write',
-    'disputes.write',
+    'disputes.read', 'disputes.write',
     'customers.read',
+    'categories.read', 'categories.write',
+    'contracts.read', 'contracts.write',
     'marketing.read',
     'logs.read',
-    'dashboard.read',
   ],
   SUPPORT: [
-    'orders.read', 'orders.write',
-    'disputes.write',
-    'customers.read', 'customers.write',
     'dashboard.read',
+    'orders.read', 'orders.write',
+    'disputes.read', 'disputes.write',
+    'customers.read', 'customers.write',
   ],
   COMPTABLE: [
     'dashboard.read',
     'finance.read', 'finance.write',
     'vendors.read',
     'orders.read',
+    'contracts.read',
   ],
   MARKETING: [
     'dashboard.read',
     'marketing.read', 'marketing.write',
     'products.read',
+    'categories.read',
   ],
 };
 
@@ -61,7 +66,12 @@ export const AdminProvider = ({ children }) => {
   const can = useCallback((action) => {
     if (!admin) return false;
     if (admin.role === 'SUPER_ADMIN') return true;
-    return (PERMISSIONS[admin.role] || []).includes(action);
+    // Permissions du rôle + permissions individuelles de cet admin
+    const rolePerm   = ROLE_DEFAULT_PERMISSIONS[admin.role] || [];
+    const customPerm = Array.isArray(admin.permissions)
+      ? admin.permissions
+      : JSON.parse(admin.permissions || '[]');
+    return rolePerm.includes(action) || customPerm.includes(action);
   }, [admin]);
 
   const loadNotifications = useCallback(async () => {

@@ -66,6 +66,7 @@ app.use('/api/admin/settings',    adminAuth, require('./routes/admin/settings'))
 app.get('/api/admin/contracts/:id/html', require('./routes/admin/contract-html'));
 app.use('/api/admin/contracts',   adminAuth, require('./routes/admin/contracts'));
 app.use('/api/admin/categories',  adminAuth, require('./routes/admin/categories'));
+app.use('/api/admin/admins',      adminAuth, require('./routes/admin/admins'));
 app.use('/api/admin/attributes', adminAuth, require('./routes/admin/attributes'));
 app.use('/api/admin/returns',    adminAuth, require('./routes/admin/returns'));
 
