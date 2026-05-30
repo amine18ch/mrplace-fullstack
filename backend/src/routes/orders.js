@@ -8,15 +8,39 @@ router.post('/', auth, async (req, res) => {
   try {
     const { shippingAddress, paymentMethod, promoCode, items } = req.body;
 
-    // Valider produits + calculer total
+    // Vérifier s'il y a une vente flash active en ce moment
+    const now = new Date();
+    const activeFlashSale = await prisma.flashSale.findFirst({
+      where: { isActive: true, startAt: { lte: now }, endAt: { gte: now } },
+    });
+    const flashProductIds = activeFlashSale
+      ? new Set(JSON.parse(activeFlashSale.productIds || '[]').map(Number))
+      : new Set();
+
+    // Valider produits + calculer total (avec prix flash si applicable)
     let subtotal = 0;
     const orderItems = [];
     for (const item of items) {
       const product = await prisma.product.findUnique({ where: { id: item.productId } });
       if (!product) return res.status(400).json({ error: `Produit ${item.productId} introuvable` });
       if (product.stock < item.qty) return res.status(400).json({ error: `Stock insuffisant pour ${product.title}` });
-      subtotal += product.price * item.qty;
-      orderItems.push({ productId: product.id, qty: item.qty, price: product.price, variant: item.variant || {} });
+
+      // Appliquer le prix flash si le produit est dans la vente flash active
+      let effectivePrice = product.price;
+      let flashApplied = false;
+      if (activeFlashSale && flashProductIds.has(product.id)) {
+        effectivePrice = parseFloat((product.price * (1 - activeFlashSale.discountPct / 100)).toFixed(3));
+        flashApplied = true;
+      }
+
+      subtotal += effectivePrice * item.qty;
+      orderItems.push({
+        productId: product.id, qty: item.qty,
+        price: effectivePrice,  // ← prix réellement facturé (flash ou normal)
+        variant: item.variant || {},
+        _flashApplied: flashApplied,
+        _originalPrice: product.price,
+      });
     }
 
     // Promo
@@ -57,9 +81,13 @@ router.post('/', auth, async (req, res) => {
     // Vider panier
     await prisma.cartItem.deleteMany({ where: { userId: req.user.id } });
 
-    // Create initial order event
+    // Créer l'événement initial (avec note si prix flash appliqué)
+    const flashItems = orderItems.filter(i => i._flashApplied);
+    const flashNote = activeFlashSale && flashItems.length
+      ? ` | Vente flash "${activeFlashSale.name}" -${activeFlashSale.discountPct}% appliquée sur ${flashItems.length} article(s)`
+      : '';
     await prisma.orderEvent.create({
-      data: { orderId: order.id, status: 'EN_ATTENTE', note: 'Commande passée', createdBy: 'CLIENT' },
+      data: { orderId: order.id, status: 'EN_ATTENTE', note: `Commande passée${flashNote}`, createdBy: 'CLIENT' },
     });
 
     // Award loyalty points (1 point per DT spent)

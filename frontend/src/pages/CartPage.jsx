@@ -1,11 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { api } from '../api/client';
 import { fmt } from '../components/ui';
 import Icon from '../components/Icon';
 
 const CartPage = () => {
   const { cart, updateCartQty, removeFromCart, navigate, promoCode, setPromoCode, applyPromo } = useApp();
   const [promoInput, setPromoInput] = useState('');
+  const [flashPrices, setFlashPrices] = useState({}); // { productId: { discountPct, saleName, endAt } }
+  const [flashSale, setFlashSale]     = useState(null);
+
+  // Vérifier les prix flash pour les produits du panier
+  useEffect(() => {
+    if (!cart.length) return;
+    const ids = cart.map(it => it.productId);
+    api.post('/flash-sales/check-prices', { productIds: ids }, false)
+      .then(({ sale, prices }) => {
+        setFlashSale(sale);
+        setFlashPrices(prices || {});
+      })
+      .catch(() => {});
+  }, [cart.length]);
+
+  // Calculer le prix effectif d'un article (flash ou normal)
+  const effectivePrice = (it) => {
+    const fp = flashPrices[it.productId];
+    if (!fp) return it.product.price;
+    return parseFloat((it.product.price * (1 - fp.discountPct / 100)).toFixed(3));
+  };
 
   const grouped = cart.reduce((acc, it) => {
     const sid = it.product.sellerId;
@@ -14,7 +36,12 @@ const CartPage = () => {
     return acc;
   }, {});
 
-  const subtotal = cart.reduce((s, it) => s + it.product.price * it.qty, 0);
+  const subtotal = cart.reduce((s, it) => s + effectivePrice(it) * it.qty, 0);
+  const flashSaving = cart.reduce((s, it) => {
+    const fp = flashPrices[it.productId];
+    if (!fp) return s;
+    return s + (it.product.price - effectivePrice(it)) * it.qty;
+  }, 0);
   const discount = promoCode ? subtotal * promoCode.discount : 0;
   const shipping  = (subtotal - discount) >= 200 ? 0 : 25;
   const vat       = (subtotal - discount) * 0.19;
@@ -87,8 +114,21 @@ const CartPage = () => {
                           </button>
                         </div>
                         <div className="text-right">
-                          <div className="text-xs text-gray-500">{fmt(it.product.price)} / unité</div>
-                          <div className="font-bold text-blue-600">{fmt(it.product.price * it.qty)}</div>
+                          {flashPrices[it.productId] ? (
+                            <>
+                              <div className="text-xs text-red-500 font-bold flex items-center justify-end gap-1">
+                                ⚡ -{flashPrices[it.productId].discountPct}% FLASH
+                              </div>
+                              <div className="text-xs text-gray-400 line-through">{fmt(it.product.price)} / unité</div>
+                              <div className="font-bold text-red-500">{fmt(effectivePrice(it))} / unité</div>
+                              <div className="font-bold text-blue-600">{fmt(effectivePrice(it) * it.qty)}</div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-xs text-gray-500">{fmt(it.product.price)} / unité</div>
+                              <div className="font-bold text-blue-600">{fmt(it.product.price * it.qty)}</div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -103,8 +143,23 @@ const CartPage = () => {
         <div>
           <div className="bg-white rounded-2xl border border-gray-200 p-5 sticky top-24">
             <h3 className="font-bold text-slate-800 mb-4">Récapitulatif</h3>
+            {/* Bannière vente flash active */}
+            {flashSale && Object.keys(flashPrices).length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+                <span className="text-lg">⚡</span>
+                <div>
+                  <div className="text-red-700 font-bold text-xs">{flashSale.name}</div>
+                  <div className="text-red-600 text-xs">-{flashSale.discountPct}% sur {Object.keys(flashPrices).length} article(s)</div>
+                </div>
+                <div className="ml-auto text-right">
+                  <div className="text-green-700 font-bold text-sm">Éco. {fmt(flashSaving)}</div>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2 text-sm mb-4">
               <div className="flex justify-between"><span className="text-gray-600">Sous-total</span><span className="font-semibold">{fmt(subtotal)}</span></div>
+              {flashSaving > 0 && <div className="flex justify-between text-red-600 font-semibold"><span>⚡ Réduction flash</span><span>-{fmt(flashSaving)}</span></div>}
               {discount > 0 && <div className="flex justify-between text-green-600"><span>Remise ({promoCode.code})</span><span>-{fmt(discount)}</span></div>}
               <div className="flex justify-between"><span className="text-gray-600">Livraison</span>
                 <span className={`font-semibold ${shipping===0?'text-green-600':''}`}>{shipping === 0 ? 'GRATUITE' : fmt(shipping)}</span>

@@ -64,4 +64,33 @@ router.get('/upcoming', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// POST /api/flash-sales/check-prices — vérifier les prix flash pour une liste de productIds
+// Utilisé par le panier pour afficher les prix réels
+router.post('/check-prices', async (req, res) => {
+  try {
+    const { productIds } = req.body;
+    if (!productIds?.length) return res.json({ sale: null, prices: {} });
+
+    const now = new Date();
+    const sale = await prisma.flashSale.findFirst({
+      where: { isActive: true, startAt: { lte: now }, endAt: { gte: now } },
+    });
+    if (!sale) return res.json({ sale: null, prices: {} });
+
+    const saleIds = new Set(JSON.parse(sale.productIds || '[]').map(Number));
+    const prices = {};
+    for (const id of productIds) {
+      if (saleIds.has(Number(id))) {
+        prices[id] = {
+          flashPrice: null, // sera calculé par le frontend avec product.price
+          discountPct: sale.discountPct,
+          saleName: sale.name,
+          endAt: sale.endAt,
+        };
+      }
+    }
+    res.json({ sale, prices });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 module.exports = router;

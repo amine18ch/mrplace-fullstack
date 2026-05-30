@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { ordersApi } from '../api/client';
+import { ordersApi, api } from '../api/client';
 import { fmt } from '../components/ui';
 import Icon from '../components/Icon';
 
@@ -15,14 +15,27 @@ const CheckoutPage = () => {
     name: user?.name || '', phone: '', governorate: 'Tunis',
     area: '', building: '', street: '', notes: '',
   });
-  const [payment, setPayment] = useState('card');
+  const [payment, setPayment]     = useState('card');
+  const [flashPrices, setFlashPrices] = useState({});
 
-  const items = cart.map(it => ({ ...it }));
-  const subtotal  = items.reduce((s,it) => s + it.product.price * it.qty, 0);
-  const discount  = promoCode ? subtotal * promoCode.discount : 0;
-  const shipping  = (subtotal-discount) >= 200 ? 0 : 25;
-  const vat       = (subtotal-discount) * 0.19;
-  const total     = subtotal - discount + shipping + vat;
+  useEffect(() => {
+    if (!cart.length) return;
+    api.post('/flash-sales/check-prices', { productIds: cart.map(it=>it.productId) }, false)
+      .then(({ prices }) => setFlashPrices(prices || {}))
+      .catch(()=>{});
+  }, []);
+
+  const effectivePrice = (it) => {
+    const fp = flashPrices[it.productId];
+    return fp ? parseFloat((it.product.price * (1 - fp.discountPct/100)).toFixed(3)) : it.product.price;
+  };
+
+  const items    = cart.map(it => ({ ...it }));
+  const subtotal = items.reduce((s,it) => s + effectivePrice(it) * it.qty, 0);
+  const discount = promoCode ? subtotal * promoCode.discount : 0;
+  const shipping = (subtotal-discount) >= 200 ? 0 : 25;
+  const vat      = (subtotal-discount) * 0.19;
+  const total    = subtotal - discount + shipping + vat;
 
   const placeOrder = async () => {
     setPlacing(true);
@@ -173,7 +186,12 @@ const CheckoutPage = () => {
                         <div className="text-sm font-medium text-slate-700 truncate">{it.product.title}</div>
                         <div className="text-xs text-gray-500">Qté: {it.qty}</div>
                       </div>
-                      <div className="font-bold text-blue-600">{fmt(it.product.price * it.qty)}</div>
+                      <div>
+                        {flashPrices[it.productId] && (
+                          <div className="text-[10px] text-red-500 font-bold text-right">⚡ -{flashPrices[it.productId].discountPct}%</div>
+                        )}
+                        <div className="font-bold text-blue-600">{fmt(effectivePrice(it) * it.qty)}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
