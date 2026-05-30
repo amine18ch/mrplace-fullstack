@@ -37,12 +37,22 @@ const HeroBanner = () => {
 
   if (!slides.length) return null;
   const cur = slides[slide];
-  const bg  = `linear-gradient(135deg, ${cur.bgFrom} 0%, ${cur.bgTo} 100%)`;
   const n   = slides.length;
 
+  const bgStyle = cur.bgImageUrl
+    ? { backgroundImage:`url(${cur.bgImageUrl})`, backgroundSize:'cover', backgroundPosition:'center' }
+    : { background:`linear-gradient(135deg, ${cur.bgFrom || '#1E3A8A'} 0%, ${cur.bgTo || '#2563EB'} 100%)` };
+
+  const handleCta = () => {
+    if (cur.sellerSlug) { navigate('seller', { slug: cur.sellerSlug }); return; }
+    if (cur.catSlug)    { navigate('category', { slug: cur.catSlug }); return; }
+    navigate('home');
+  };
+
   return (
-    <div className="relative overflow-hidden rounded-2xl mx-4 mt-4 h-64 sm:h-80" style={{ background: bg }}>
-      <div className="max-w-[1400px] mx-auto h-full flex items-center justify-between px-6 sm:px-12">
+    <div className="relative overflow-hidden rounded-2xl mx-4 mt-4 h-64 sm:h-80" style={bgStyle}>
+      {cur.bgImageUrl && <div className="absolute inset-0 bg-black/40" />}
+      <div className="max-w-[1400px] mx-auto h-full flex items-center justify-between px-6 sm:px-12 relative z-10">
         <div className="text-white max-w-xl anim-fadeIn" key={cur.id}>
           <div className="inline-block bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-bold mb-3">{cur.title}</div>
           <h1 className="text-3xl sm:text-5xl font-extrabold mb-3 text-shadow">{cur.subtitle}</h1>
@@ -55,10 +65,9 @@ const HeroBanner = () => {
               </span>
             ))}
           </div>
-          <button
-            onClick={() => cur.catSlug ? navigate('category',{slug:cur.catSlug}) : navigate('search',{query:''})}
+          <button onClick={handleCta}
             className="bg-white text-blue-700 px-5 sm:px-7 py-2.5 sm:py-3 rounded-full font-bold hover:bg-blue-50 transition shadow-lg text-sm sm:text-base">
-            {cur.ctaText} →
+            {cur.ctaText || 'Découvrir'} →
           </button>
         </div>
         <div className="hidden md:block text-[140px] lg:text-[180px] opacity-90 select-none">{cur.emoji}</div>

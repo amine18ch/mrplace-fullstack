@@ -57,6 +57,31 @@ router.post('/categories', adminAuth, upload.single('image'), (req, res) => {
   res.status(400).json({ error: err.message });
 });
 
+// POST /api/upload/banners — admin/modérateur (image de fond bannière)
+const bannerUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = path.join(UPLOADS_DIR, 'banners');
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase().replace(/jpeg/, 'jpg');
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  fileFilter,
+  limits: { fileSize: 3 * 1024 * 1024 }, // 3 Mo pour les banners
+});
+
+router.post('/banners', adminAuth, bannerUpload.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+  const url = `/uploads/banners/${req.file.filename}`;
+  res.json({ url, filename: req.file.filename });
+}, (err, req, res, next) => {
+  res.status(400).json({ error: err.message });
+});
+
 // DELETE /api/upload/:type/:filename — supprimer un fichier
 router.delete('/:type/:filename', (req, res) => {
   try {

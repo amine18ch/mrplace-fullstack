@@ -349,11 +349,14 @@ model Banner {
   subtitle    String   @default("")
   description String   @default("")
   ctaText     String   @default("Découvrir")
+  // Cible du clic : catégorie, boutique vendeur, ou accueil
   catSlug     String   @default("")
+  sellerSlug  String   @default("")
+  // Fond : dégradé ou image
   bgFrom      String   @default("#1E3A8A")
   bgTo        String   @default("#2563EB")
+  bgImageUrl  String   @default("")
   emoji       String   @default("🎉")
-  imageUrl    String   @default("")
   isActive    Boolean  @default(true)
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
