@@ -43,49 +43,89 @@ router.get('/payment-cycles', async (req, res) => {
 });
 
 // POST /api/admin/finance/payment-cycles/generate
+// Params optionnels:
+//   sellerId   — générer uniquement pour un vendeur spécifique
+//   force      — recalculer même si le cycle existe déjà
+//   statuses   — statuts inclus (défaut: LIVREE,EXPEDIEE)
+//   month, year — période personnalisée
 router.post('/payment-cycles/generate', async (req, res) => {
   try {
+    const { sellerId, force = false, statuses, month, year } = req.body;
+
     const now = new Date();
-    const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    const m = month !== undefined ? parseInt(month) : now.getMonth();
+    const y = year  !== undefined ? parseInt(year)  : now.getFullYear();
+    const periodStart = new Date(y, m, 1);
+    const periodEnd   = new Date(y, m + 1, 0, 23, 59, 59);
 
     const globalCommission = await prisma.commission.findFirst({ where: { type: 'GLOBAL', isActive: true } });
-    const rate = globalCommission ? globalCommission.rate : 0.10;
+    const globalRate = globalCommission ? globalCommission.rate : 0.10;
 
-    const sellers = await prisma.seller.findMany();
+    // Statuts éligibles au versement (LIVREE = livré et confirmé, EXPEDIEE = expédié)
+    const eligibleStatuses = statuses || ['LIVREE', 'EXPEDIEE'];
+
+    const sellers = sellerId
+      ? await prisma.seller.findMany({ where: { id: parseInt(sellerId) } })
+      : await prisma.seller.findMany({ where: { isActive: true } });
+
     const created = [];
+    const updated = [];
+    const skipped = [];
 
     for (const seller of sellers) {
       const orderItems = await prisma.orderItem.findMany({
         where: {
           product: { sellerId: seller.id },
-          order: { status: 'LIVREE', createdAt: { gte: periodStart, lte: periodEnd } }
-        }
+          order: {
+            status: { in: eligibleStatuses },
+            updatedAt: { gte: periodStart, lte: periodEnd },
+          },
+        },
       });
 
       const grossAmount = orderItems.reduce((s, i) => s + i.price * i.qty, 0);
-      if (grossAmount === 0) continue;
+      if (grossAmount === 0) { skipped.push(seller.name); continue; }
 
       const sellerCommission = await prisma.commission.findFirst({
-        where: { sellerId: seller.id, isActive: true }
-      }) || globalCommission;
-      const commissionRate = sellerCommission ? sellerCommission.rate : rate;
+        where: { sellerId: seller.id, isActive: true },
+        orderBy: { type: 'desc' },
+      });
+      const commissionRate = sellerCommission ? sellerCommission.rate : globalRate;
       const commission = grossAmount * commissionRate;
-      const netAmount = grossAmount - commission;
+      const netAmount  = grossAmount - commission;
 
       const existing = await prisma.paymentCycle.findFirst({
-        where: { sellerId: seller.id, periodStart, periodEnd }
+        where: { sellerId: seller.id, periodStart, periodEnd },
       });
-      if (!existing) {
+
+      if (existing) {
+        if (force && existing.status !== 'PAID') {
+          // Recalculer si pas encore payé
+          await prisma.paymentCycle.update({
+            where: { id: existing.id },
+            data: { grossAmount, commission, netAmount },
+          });
+          updated.push({ seller: seller.name, netAmount });
+        } else {
+          skipped.push(seller.name + (existing.status === 'PAID' ? ' (déjà payé)' : ' (existe déjà, utilisez force=true pour recalculer)'));
+        }
+      } else {
         const cycle = await prisma.paymentCycle.create({
-          data: { sellerId: seller.id, periodStart, periodEnd, grossAmount, commission, netAmount }
+          data: { sellerId: seller.id, periodStart, periodEnd, grossAmount, commission, netAmount },
         });
-        created.push(cycle);
+        created.push({ seller: seller.name, netAmount });
       }
     }
 
-    await logAction(req.admin.id, 'GENERATE_CYCLES', 'finance', null, { count: created.length }, req.ip);
-    res.json({ created: created.length, cycles: created });
+    await logAction(req.admin.id, 'GENERATE_CYCLES', 'finance', null,
+      { created: created.length, updated: updated.length, skipped: skipped.length }, req.ip);
+
+    res.json({
+      period: `${periodStart.toLocaleDateString('fr-TN')} — ${periodEnd.toLocaleDateString('fr-TN')}`,
+      statuses: eligibleStatuses,
+      created, updated, skipped,
+      message: `${created.length} créé(s), ${updated.length} mis à jour, ${skipped.length} ignoré(s)`,
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

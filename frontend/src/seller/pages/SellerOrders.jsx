@@ -116,7 +116,7 @@ export default function SellerOrders() {
 
               {/* Actions vendeur */}
               <div className="flex gap-2">
-                <button onClick={() => { setSelected(o); setNewStatus(o.status); }}
+                <button onClick={() => { setSelected(o); setNewStatus(''); setTracking(''); }}
                   className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-2 rounded-lg transition-colors">
                   Voir détails / Changer statut
                 </button>
@@ -187,24 +187,41 @@ export default function SellerOrders() {
               {/* Changer statut */}
               {['CONFIRMEE', 'EN_ATTENTE', 'EN_PREPARATION'].includes(selected.status) && (
                 <div className="bg-slate-900 rounded-xl p-4">
-                  <div className="text-slate-400 text-xs font-semibold mb-3">METTRE À JOUR LE STATUT</div>
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    {['EN_PREPARATION','EXPEDIEE'].map(s => (
-                      <button key={s} onClick={() => setNewStatus(s)}
-                        className={`py-2.5 px-3 rounded-lg text-xs font-medium border transition-colors ${newStatus===s?'border-blue-500 bg-blue-500/20 text-blue-300':'border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600'}`}>
-                        {STATUS_LABELS[s]}
-                      </button>
-                    ))}
+                  <div className="text-slate-400 text-xs font-semibold mb-1">FAIRE AVANCER LA COMMANDE</div>
+                  <p className="text-slate-600 text-xs mb-3">
+                    Statut actuel : <span className={`font-semibold ${STATUS_COLORS[selected.status]?.replace('bg-','text-').split(' ')[0] || 'text-slate-400'}`}>{STATUS_LABELS[selected.status]}</span>
+                  </p>
+                  {/* Statuts disponibles — exclure le statut actuel */}
+                  <div className="space-y-2 mb-3">
+                    {['EN_PREPARATION', 'EXPEDIEE']
+                      .filter(s => s !== selected.status) // ne jamais proposer le statut actuel
+                      .map(s => (
+                        <button key={s} onClick={() => setNewStatus(s)}
+                          className={`w-full flex items-center gap-3 py-3 px-4 rounded-xl text-sm font-medium border transition-all ${
+                            newStatus === s
+                              ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+                              : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-500'
+                          }`}>
+                          <span className="text-xl">{s === 'EN_PREPARATION' ? '🔧' : '🚚'}</span>
+                          <div className="text-left">
+                            <div>{STATUS_LABELS[s]}</div>
+                            <div className="text-xs opacity-60">{s === 'EN_PREPARATION' ? 'Vous préparez les articles' : 'Colis remis au transporteur'}</div>
+                          </div>
+                          {newStatus === s && <span className="ml-auto text-blue-400">✓</span>}
+                        </button>
+                      ))
+                    }
                   </div>
                   {newStatus === 'EXPEDIEE' && (
                     <input value={trackingNum} onChange={e => setTracking(e.target.value)}
-                      placeholder="Numéro de suivi (optionnel)"
+                      placeholder="Numéro de suivi transporteur (optionnel)"
                       className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 mb-3"
                     />
                   )}
-                  <button onClick={handleStatusUpdate} disabled={!newStatus || newStatus===selected.status || actionLoading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
-                    {actionLoading ? 'Mise à jour...' : 'Confirmer le statut'}
+                  <button onClick={handleStatusUpdate}
+                    disabled={!newStatus || actionLoading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-semibold transition-colors">
+                    {actionLoading ? 'Mise à jour...' : newStatus ? `✓ Passer en "${STATUS_LABELS[newStatus]}"` : 'Sélectionnez un statut ci-dessus'}
                   </button>
                 </div>
               )}

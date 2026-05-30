@@ -57,7 +57,9 @@ export default function AdminFinance() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [confirmGenerate, setConfirmGenerate] = useState(false);
-  const [error, setError] = useState('');
+  const [genResult, setGenResult]   = useState(null);
+  const [genOptions, setGenOptions] = useState({ force: false, statuses: ['LIVREE','EXPEDIEE'] });
+  const [error, setError]           = useState('');
 
   const loadData = () => {
     setLoading(true);
@@ -76,18 +78,17 @@ export default function AdminFinance() {
   useEffect(() => { loadData(); }, []);
 
   const handleGenerateCycles = async () => {
-    setActionLoading(true);
-    setError('');
+    setActionLoading(true); setError('');
     try {
-      const result = await adminApi.post('/finance/payment-cycles/generate', {});
+      const result = await adminApi.post('/finance/payment-cycles/generate', {
+        force:    genOptions.force,
+        statuses: genOptions.statuses,
+      });
+      setGenResult(result);
       setConfirmGenerate(false);
-      alert(`${result.created} cycle(s) généré(s) avec succès`);
       loadData();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setActionLoading(false);
-    }
+    } catch (e) { setError(e.message); }
+    finally { setActionLoading(false); }
   };
 
   const handlePay = async (id) => {
@@ -279,17 +280,87 @@ export default function AdminFinance() {
         </div>
       )}
 
+      {/* Résultat génération */}
+      {genResult && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={()=>setGenResult(null)}>
+          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md border border-slate-700" onClick={e=>e.stopPropagation()}>
+            <h3 className="text-white font-semibold mb-3">✅ Génération terminée</h3>
+            <p className="text-blue-400 text-sm font-medium mb-3">{genResult.period} · Statuts : {genResult.statuses?.join(', ')}</p>
+            <div className="space-y-2 mb-4 text-sm">
+              {genResult.created?.length > 0 && (
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                  <div className="text-green-400 font-semibold mb-1">✓ {genResult.created.length} cycle(s) créé(s)</div>
+                  {genResult.created.map((c,i)=><div key={i} className="text-green-300 text-xs">{c.seller} — {new Intl.NumberFormat('fr-TN',{minimumFractionDigits:3}).format(c.netAmount)} DT net</div>)}
+                </div>
+              )}
+              {genResult.updated?.length > 0 && (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                  <div className="text-blue-400 font-semibold mb-1">🔄 {genResult.updated.length} cycle(s) mis à jour</div>
+                  {genResult.updated.map((c,i)=><div key={i} className="text-blue-300 text-xs">{c.seller} — {new Intl.NumberFormat('fr-TN',{minimumFractionDigits:3}).format(c.netAmount)} DT net</div>)}
+                </div>
+              )}
+              {genResult.skipped?.length > 0 && (
+                <div className="bg-slate-700 rounded-lg p-3">
+                  <div className="text-slate-400 font-semibold mb-1">— {genResult.skipped.length} ignoré(s)</div>
+                  {genResult.skipped.map((s,i)=><div key={i} className="text-slate-500 text-xs">{s}</div>)}
+                </div>
+              )}
+            </div>
+            <button onClick={()=>setGenResult(null)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium">Fermer</button>
+          </div>
+        </div>
+      )}
+
       {/* Confirm generate modal */}
       {confirmGenerate && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-sm border border-slate-700">
-            <h3 className="text-white font-semibold mb-2">Générer les cycles du mois</h3>
-            <p className="text-slate-400 text-sm mb-4">
-              Cette action va calculer le CA de chaque vendeur pour le mois courant et créer les cycles de paiement correspondants. Les cycles déjà existants ne seront pas dupliqués.
-            </p>
+          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md border border-slate-700">
+            <h3 className="text-white font-semibold mb-2">Générer les cycles de versement</h3>
+            <p className="text-slate-400 text-sm mb-4">Calcule le CA de chaque vendeur pour le mois courant et crée les cycles de paiement correspondants.</p>
+
+            {/* Options */}
+            <div className="space-y-3 mb-5">
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                <div className="text-slate-400 text-xs font-semibold mb-2">STATUTS DE COMMANDES INCLUS</div>
+                <div className="space-y-2">
+                  {[
+                    { v:'LIVREE',   l:'Livrée',   d:'Commandes confirmées livraison' },
+                    { v:'EXPEDIEE', l:'Expédiée',  d:'Commandes remises au transporteur' },
+                  ].map(s => (
+                    <label key={s.v} className="flex items-center gap-3 cursor-pointer">
+                      <input type="checkbox"
+                        checked={genOptions.statuses.includes(s.v)}
+                        onChange={e => setGenOptions(o => ({
+                          ...o, statuses: e.target.checked
+                            ? [...o.statuses, s.v]
+                            : o.statuses.filter(x=>x!==s.v)
+                        }))}
+                        className="accent-blue-600 w-4 h-4"
+                      />
+                      <div>
+                        <div className="text-slate-200 text-sm font-medium">{s.l}</div>
+                        <div className="text-slate-600 text-xs">{s.d}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <label className="flex items-center gap-3 bg-slate-900 border border-slate-700 rounded-xl p-4 cursor-pointer">
+                <input type="checkbox" checked={genOptions.force}
+                  onChange={e=>setGenOptions(o=>({...o, force:e.target.checked}))}
+                  className="accent-orange-500 w-4 h-4"
+                />
+                <div>
+                  <div className="text-slate-200 text-sm font-medium">🔄 Forcer le recalcul</div>
+                  <div className="text-slate-600 text-xs">Recalculer les cycles existants (non encore payés)</div>
+                </div>
+              </label>
+            </div>
+
             <div className="flex gap-3">
-              <button onClick={() => setConfirmGenerate(false)} className="flex-1 bg-slate-700 text-slate-300 py-2 rounded-lg text-sm hover:bg-slate-600">Annuler</button>
-              <button onClick={handleGenerateCycles} disabled={actionLoading} className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-60">
+              <button onClick={() => setConfirmGenerate(false)} className="flex-1 bg-slate-700 text-slate-300 py-2.5 rounded-lg text-sm hover:bg-slate-600">Annuler</button>
+              <button onClick={handleGenerateCycles} disabled={actionLoading || !genOptions.statuses.length}
+                className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-60">
                 {actionLoading ? 'Génération...' : 'Générer'}
               </button>
             </div>
