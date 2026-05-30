@@ -94,11 +94,12 @@ const HeroBanner = () => {
 const HomePage = () => {
   const { navigate, recentlyViewed, categories: cats } = useApp();
   const [flash, setFlash]         = useState([]);
-  const [flashSale, setFlashSale] = useState(null); // vente flash active
+  const [flashSale, setFlashSale] = useState(null);
   const [trending, setTrending]   = useState([]);
   const [sellers, setSellers]     = useState([]);
+  const [promoCards, setPromoCards] = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [flashTime, setFlashTime] = useState(null); // null = pas de vente flash active
+  const [flashTime, setFlashTime] = useState(null);
 
   // Countdown basé sur endAt réel
   useEffect(() => {
@@ -118,10 +119,11 @@ const HomePage = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [flashData, tp, sp] = await Promise.all([
+      const [flashData, tp, sp, pc] = await Promise.all([
         api.get('/flash-sales', false).catch(() => ({ sale: null, products: [] })),
         productsApi.list({ sort:'popular', limit:8 }),
         sellersApi.list(),
+        api.get('/banners?type=PROMO', false).catch(() => []),
       ]);
       if (flashData.sale) {
         setFlashSale(flashData.sale);
@@ -133,6 +135,7 @@ const HomePage = () => {
       }
       setTrending(tp.products);
       setSellers(sp);
+      setPromoCards(Array.isArray(pc) ? pc : []);
       setLoading(false);
     };
     load().catch(() => setLoading(false));
@@ -209,28 +212,36 @@ const HomePage = () => {
         </section>
       )}
 
-      {/* Promo Banners */}
-      <section className="max-w-[1400px] mx-auto px-4 mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {[
-          { t:'Tech Premium', d:'Apple, Samsung & plus', cat:'electronics', e:'📱', bg:'linear-gradient(135deg,#0A1F44 0%,#2563EB 100%)' },
-          { t:'Semaine Mode', d:'Nouvelles collections', cat:'fashion', e:'👗', bg:'linear-gradient(135deg,#2563EB 0%,#60A5FA 100%)' },
-          { t:'Relooking Maison', d:'Jusqu\'à -50%', cat:'home', e:'🛋️', bg:'linear-gradient(135deg,#1E3A8A 0%,#3B82F6 100%)' },
-          { t:'Sélection Beauté', d:'Marques de luxe', cat:'beauty', e:'💄', bg:'linear-gradient(135deg,#3B82F6 0%,#DBEAFE 100%)' },
-        ].map((b,i) => (
-          <div key={i} onClick={() => navigate('category', { slug: b.cat })}
-            style={{ background: b.bg }}
-            className="rounded-2xl p-6 cursor-pointer hover-lift flex items-center justify-between text-white overflow-hidden">
-            <div>
-              <div className="text-2xl font-extrabold mb-1 text-shadow">{b.t}</div>
-              <div className="text-sm opacity-90 mb-3">{b.d}</div>
-              <button className="bg-white text-blue-700 px-5 py-2 rounded-full text-sm font-bold hover:bg-blue-50 transition">
-                Voir maintenant →
-              </button>
-            </div>
-            <div className="text-7xl opacity-90">{b.e}</div>
-          </div>
-        ))}
-      </section>
+      {/* Mini-bannières promotionnelles */}
+      {promoCards.length > 0 && (
+        <section className="max-w-[1400px] mx-auto px-4 mt-10 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {promoCards.map(b => {
+            const bgStyle = b.bgImageUrl
+              ? { backgroundImage:`url(${b.bgImageUrl})`, backgroundSize:'cover', backgroundPosition:'center' }
+              : { background:`linear-gradient(135deg, ${b.bgFrom} 0%, ${b.bgTo} 100%)` };
+            const handleClick = () => {
+              if (b.sellerSlug) navigate('seller', { slug: b.sellerSlug });
+              else if (b.catSlug) navigate('category', { slug: b.catSlug });
+              else navigate('home');
+            };
+            return (
+              <div key={b.id} onClick={handleClick} style={bgStyle}
+                className="relative rounded-2xl p-6 cursor-pointer hover-lift flex items-center justify-between text-white overflow-hidden">
+                {b.bgImageUrl && <div className="absolute inset-0 bg-black/35" />}
+                <div className="relative z-10">
+                  <div className="text-2xl font-extrabold mb-1 text-shadow">{b.title}</div>
+                  <div className="text-sm opacity-90 mb-1">{b.subtitle}</div>
+                  {b.description && <div className="text-xs opacity-70 mb-3">{b.description}</div>}
+                  <button className="bg-white text-blue-700 px-5 py-2 rounded-full text-sm font-bold hover:bg-blue-50 transition">
+                    {b.ctaText || 'Voir maintenant'} →
+                  </button>
+                </div>
+                <div className="text-7xl opacity-90 relative z-10 select-none">{b.emoji}</div>
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       {/* Trending */}
       <section className="max-w-[1400px] mx-auto px-4 mt-10">

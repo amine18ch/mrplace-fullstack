@@ -224,6 +224,7 @@ const BannerForm = ({ form, set, cats, sellers, bgFileRef, uploadingBg, handleBg
 
 export default function AdminBanners() {
   const { can } = useAdmin();
+  const [tab, setTab]           = useState('HERO'); // HERO | PROMO
   const [banners, setBanners]   = useState([]);
   const [loading, setLoading]   = useState(true);
   const [modal, setModal]       = useState(null);
@@ -239,9 +240,9 @@ export default function AdminBanners() {
 
   const load = () => {
     setLoading(true);
-    adminApi.get('/marketing/banners').then(setBanners).catch(()=>{}).finally(()=>setLoading(false));
+    adminApi.get(`/marketing/banners?type=${tab}`).then(setBanners).catch(()=>{}).finally(()=>setLoading(false));
   };
-  useEffect(load, []);
+  useEffect(load, [tab]);
   useEffect(() => {
     fetch('/api/categories').then(r=>r.json()).then(setCats).catch(()=>{});
     fetch('/api/sellers').then(r=>r.json()).then(setSellers).catch(()=>{});
@@ -295,7 +296,7 @@ export default function AdminBanners() {
         bgImageUrl: form.bgType === 'image' ? form.bgImageUrl : '',
         emoji: form.emoji, sortOrder: parseInt(form.sortOrder) || 0,
       };
-      if (modal === 'create') await adminApi.post('/marketing/banners', payload);
+      if (modal === 'create') await adminApi.post('/marketing/banners', { ...payload, type: tab });
       else await adminApi.patch(`/marketing/banners/${editId}`, payload);
       flash(modal === 'create' ? 'Banner créé ✓' : 'Mis à jour ✓');
       setModal(null); load();
@@ -326,15 +327,43 @@ export default function AdminBanners() {
 
   return (
     <div className="p-6 max-w-5xl">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="text-xl font-bold text-white">Banners & Slider Hero</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Gérez les slides du carrousel de la homepage</p>
+          <h2 className="text-xl font-bold text-white">Banners & Visuels</h2>
+          <p className="text-slate-500 text-sm mt-0.5">Gérez les bannières et mini-cartes de la homepage</p>
         </div>
         <button onClick={openCreate} className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2.5 rounded-xl font-medium flex items-center gap-2">
-          + Nouveau banner
+          + Nouveau
         </button>
       </div>
+
+      {/* Onglets HERO / PROMO */}
+      <div className="flex gap-1 mb-6 bg-slate-900 border border-slate-800 rounded-xl p-1">
+        {[
+          { key:'HERO',  label:'🖼️ Slider Hero', desc:'Carrousel principal' },
+          { key:'PROMO', label:'🃏 Mini-bannières', desc:'4 cartes sous le slider' },
+        ].map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`flex-1 flex flex-col items-center py-2.5 px-4 rounded-lg text-sm font-medium transition ${tab===t.key ? 'bg-slate-800 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}>
+            <span>{t.label}</span>
+            <span className="text-xs font-normal opacity-60">{t.desc}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Contexte selon l'onglet */}
+      {tab === 'HERO' && (
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 mb-5 text-xs text-blue-400 flex items-start gap-2">
+          <span className="text-lg flex-shrink-0">🖥️</span>
+          <span>Ces slides s'affichent dans le <strong>grand carrousel</strong> en haut de la homepage. Idéal pour les promotions majeures.</span>
+        </div>
+      )}
+      {tab === 'PROMO' && (
+        <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-3 mb-5 text-xs text-violet-400 flex items-start gap-2">
+          <span className="text-lg flex-shrink-0">🃏</span>
+          <span>Ces mini-cartes s'affichent en <strong>grille 2 colonnes</strong> sous les offres flash. Maximum 4 recommandé pour l'affichage optimal. Chaque carte peut cibler une catégorie ou une boutique vendeur.</span>
+        </div>
+      )}
 
       {error   && <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg p-3 mb-4">{error}</div>}
       {success && <div className="bg-green-500/10 border border-green-500/30 text-green-400 text-sm rounded-lg p-3 mb-4">{success}</div>}
@@ -383,7 +412,11 @@ export default function AdminBanners() {
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4" onClick={()=>setModal(null)}>
           <div className="bg-slate-800 rounded-xl border border-slate-700 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-slate-700 sticky top-0 bg-slate-800 z-10">
-              <h3 className="text-white font-semibold">{modal === 'create' ? '+ Nouveau banner' : 'Modifier le banner'}</h3>
+              <h3 className="text-white font-semibold">
+                {modal === 'create'
+                  ? tab === 'PROMO' ? '+ Nouvelle mini-bannière' : '+ Nouveau slider'
+                  : 'Modifier le banner'}
+              </h3>
               <button onClick={()=>setModal(null)} className="text-slate-400 hover:text-white w-8 h-8 flex items-center justify-center rounded text-xl">×</button>
             </div>
             {error && <div className="mx-5 mt-4 bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-lg p-3">{error}</div>}

@@ -66,7 +66,9 @@ router.post('/promo-codes/:id/toggle', requireRole('MARKETING'), async (req, res
 // BANNERS - GET (all roles)
 router.get('/banners', async (req, res) => {
   try {
-    const banners = await prisma.banner.findMany({ orderBy: { sortOrder: 'asc' } });
+    const { type } = req.query;
+    const where = type ? { type } : {};
+    const banners = await prisma.banner.findMany({ where, orderBy: { sortOrder: 'asc' } });
     res.json(banners);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -76,6 +78,7 @@ router.post('/banners', requireRole('MARKETING', 'MODERATEUR'), async (req, res)
     const { title, subtitle, description, ctaText, catSlug, sellerSlug, bgFrom, bgTo, bgImageUrl, emoji, sortOrder } = req.body;
     const banner = await prisma.banner.create({
       data: {
+        type: req.body.type || 'HERO',
         title: title || 'Nouveau banner',
         subtitle: subtitle || '', description: description || '',
         ctaText: ctaText || 'Découvrir',

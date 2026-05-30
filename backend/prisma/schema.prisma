@@ -345,14 +345,13 @@ model Dispute {
 
 model Banner {
   id          Int      @id @default(autoincrement())
+  type        String   @default("HERO")   // HERO = slider principal | PROMO = mini-cartes homepage
   title       String
   subtitle    String   @default("")
   description String   @default("")
   ctaText     String   @default("Découvrir")
-  // Cible du clic : catégorie, boutique vendeur, ou accueil
   catSlug     String   @default("")
   sellerSlug  String   @default("")
-  // Fond : dégradé ou image
   bgFrom      String   @default("#1E3A8A")
   bgTo        String   @default("#2563EB")
   bgImageUrl  String   @default("")
