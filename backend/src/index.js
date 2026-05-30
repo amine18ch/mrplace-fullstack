@@ -19,7 +19,8 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Routes
 app.use('/api/upload',     require('./routes/upload'));
-app.use('/api/banners',    require('./routes/banners'));
+app.use('/api/banners',     require('./routes/banners'));
+app.use('/api/flash-sales', require('./routes/flash-sales'));
 app.use('/api/auth',       require('./routes/auth'));
 app.use('/api/products',   require('./routes/products'));
 app.use('/api/cart',       require('./routes/cart'));

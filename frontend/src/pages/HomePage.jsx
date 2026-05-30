@@ -93,34 +93,49 @@ const HeroBanner = () => {
 
 const HomePage = () => {
   const { navigate, recentlyViewed, categories: cats } = useApp();
-  const [flash, setFlash]       = useState([]);
-  const [trending, setTrending] = useState([]);
-  const [sellers, setSellers]   = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [flashTime, setFlashTime] = useState({ h:5, m:12, s:30 });
+  const [flash, setFlash]         = useState([]);
+  const [flashSale, setFlashSale] = useState(null); // vente flash active
+  const [trending, setTrending]   = useState([]);
+  const [sellers, setSellers]     = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [flashTime, setFlashTime] = useState(null); // null = pas de vente flash active
 
+  // Countdown basé sur endAt réel
   useEffect(() => {
-    const t = setInterval(() => setFlashTime(p => {
-      let s=p.s-1,m=p.m,h=p.h;
-      if(s<0){s=59;m--;} if(m<0){m=59;h--;} if(h<0){h=23;}
-      return {h,m,s};
-    }), 1000);
+    if (!flashSale) return;
+    const tick = () => {
+      const diff = Math.max(0, new Date(flashSale.endAt) - new Date());
+      if (diff === 0) { setFlashTime({ h:0, m:0, s:0 }); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setFlashTime({ h, m, s });
+    };
+    tick();
+    const t = setInterval(tick, 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [flashSale]);
 
   useEffect(() => {
     const load = async () => {
-      const [fp, tp, sp] = await Promise.all([
-        productsApi.list({ sort:'discount', limit:10 }),
+      const [flashData, tp, sp] = await Promise.all([
+        api.get('/flash-sales', false).catch(() => ({ sale: null, products: [] })),
         productsApi.list({ sort:'popular', limit:8 }),
         sellersApi.list(),
       ]);
-      setFlash(fp.products);
+      if (flashData.sale) {
+        setFlashSale(flashData.sale);
+        setFlash(flashData.products);
+      } else {
+        // Fallback : produits les plus remisés
+        const fp = await productsApi.list({ sort:'discount', limit:10 }).catch(() => ({ products:[] }));
+        setFlash(fp.products);
+      }
       setTrending(tp.products);
       setSellers(sp);
       setLoading(false);
     };
-    load().catch(console.error);
+    load().catch(() => setLoading(false));
   }, []);
 
   return (
@@ -142,39 +157,57 @@ const HomePage = () => {
       </section>
 
       {/* Flash Deals */}
-      <section className="max-w-[1400px] mx-auto px-4 mt-10">
-        <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-t-2xl p-4 flex items-center justify-between text-white">
-          <div className="flex items-center gap-3">
-            <Icon name="zap" size={24} className="fill-current" />
-            <h2 className="text-2xl font-extrabold">OFFRES FLASH</h2>
-            <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold">Temps limité !</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm font-semibold">
-            <span>Se termine dans:</span>
-            <div className="flex gap-1">
-              {[flashTime.h, flashTime.m, flashTime.s].map((v,i) => (
-                <span key={i} className="bg-slate-900 px-2 py-1 rounded text-xs font-bold min-w-[28px] text-center">
-                  {String(v).padStart(2,'0')}
+      {(flash.length > 0 || loading) && (
+        <section className="max-w-[1400px] mx-auto px-4 mt-10">
+          <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-t-2xl p-4 flex items-center justify-between text-white flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <Icon name="zap" size={24} className="fill-current" />
+              <h2 className="text-xl sm:text-2xl font-extrabold">
+                {flashSale ? flashSale.name : 'OFFRES FLASH'}
+              </h2>
+              {flashSale && (
+                <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-full text-xs font-semibold">
+                  -{flashSale.discountPct}% sur les articles sélectionnés
                 </span>
-              ))}
+              )}
+            </div>
+            {flashTime && (
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <span className="hidden sm:inline">Se termine dans :</span>
+                <div className="flex gap-1">
+                  {[flashTime.h, flashTime.m, flashTime.s].map((v, i) => (
+                    <span key={i} className="bg-slate-900 px-2 py-1 rounded text-xs font-bold min-w-[28px] text-center">
+                      {String(v).padStart(2,'0')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="bg-white rounded-b-2xl p-4 border border-t-0 border-gray-200">
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+              {loading
+                ? Array(6).fill(0).map((_,i) => <div key={i} className="shrink-0 w-52"><SkeletonCard /></div>)
+                : flash.map(p => {
+                    // Prix flash si vente flash active
+                    const displayPrice = p.flashPrice || p.price;
+                    const displayDiscount = p.flashDiscount || p.discount;
+                    const pct = p.stock > 0 ? Math.min(95, Math.round((p.soldCount / (p.soldCount + p.stock)) * 100)) || Math.floor(30 + Math.random()*50) : 99;
+                    return (
+                      <div key={p.id} className="shrink-0 w-52">
+                        <ProductCard product={{...p, price: displayPrice, discount: displayDiscount}} />
+                        <div className="mt-2 bg-orange-50 rounded-full h-1.5 overflow-hidden">
+                          <div className="bg-gradient-to-r from-red-500 to-orange-500 h-full transition-all" style={{ width:`${pct}%` }} />
+                        </div>
+                        <div className="text-[10px] text-orange-600 font-semibold mt-1">🔥 {pct}% vendu</div>
+                      </div>
+                    );
+                  })
+              }
             </div>
           </div>
-        </div>
-        <div className="bg-white rounded-b-2xl p-4 border border-t-0 border-gray-200">
-          <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
-            {loading ? Array(6).fill(0).map((_,i) => <div key={i} className="shrink-0 w-56"><SkeletonCard /></div>)
-              : flash.map(p => (
-                <div key={p.id} className="shrink-0 w-56">
-                  <ProductCard product={p} />
-                  <div className="mt-2 bg-orange-50 rounded-full h-2 overflow-hidden">
-                    <div className="bg-gradient-to-r from-red-500 to-orange-500 h-full" style={{ width: `${40+Math.random()*40}%` }} />
-                  </div>
-                  <div className="text-[10px] text-orange-600 font-semibold mt-1">🔥 {Math.floor(40+Math.random()*40)}% vendu</div>
-                </div>
-              ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Promo Banners */}
       <section className="max-w-[1400px] mx-auto px-4 mt-10 grid grid-cols-1 md:grid-cols-2 gap-4">

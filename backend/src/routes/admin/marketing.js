@@ -128,48 +128,93 @@ router.patch('/banners/:id/toggle', requireRole('MARKETING'), async (req, res) =
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// FLASH SALES - GET (all roles)
+// FLASH SALES
 router.get('/flash-sales', async (req, res) => {
   try {
-    const sales = await prisma.flashSale.findMany({ orderBy: { createdAt: 'desc' } });
-    res.json(sales);
+    const sales = await prisma.flashSale.findMany({ orderBy: { startAt: 'desc' } });
+    // Enrichir avec les produits
+    const enriched = await Promise.all(sales.map(async s => {
+      const ids = JSON.parse(s.productIds || '[]').map(Number).filter(Boolean);
+      const products = ids.length ? await prisma.product.findMany({
+        where: { id: { in: ids } },
+        select: { id:true, title:true, price:true, images:true, isActive:true },
+      }) : [];
+      const now = new Date();
+      const status = !s.isActive ? 'inactive'
+        : s.endAt < now ? 'expired'
+        : s.startAt > now ? 'upcoming'
+        : 'active';
+      return { ...s, products, status };
+    }));
+    res.json(enriched);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/flash-sales', requireRole('MARKETING'), async (req, res) => {
+router.post('/flash-sales', requireRole('MARKETING', 'MODERATEUR'), async (req, res) => {
   try {
-    const { name, startAt, endAt, discountPct, isActive, productIds } = req.body;
+    const { name, startAt, endAt, discountPct, productIds } = req.body;
+    if (!name || !startAt || !endAt || !discountPct) return res.status(400).json({ error: 'Champs requis manquants' });
     const sale = await prisma.flashSale.create({
       data: {
         name, startAt: new Date(startAt), endAt: new Date(endAt),
-        discountPct: parseInt(discountPct), isActive: isActive !== false,
-        productIds: JSON.stringify(productIds || [])
-      }
+        discountPct: parseInt(discountPct),
+        isActive: true,
+        productIds: JSON.stringify(productIds || []),
+      },
     });
     await logAction(req.admin.id, 'CREATE_FLASH_SALE', 'marketing', sale.id, { name }, req.ip);
     res.json(sale);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.patch('/flash-sales/:id', requireRole('MARKETING'), async (req, res) => {
+router.put('/flash-sales/:id', requireRole('MARKETING', 'MODERATEUR'), async (req, res) => {
   try {
     const { name, startAt, endAt, discountPct, isActive, productIds } = req.body;
     const data = {};
-    if (name !== undefined) data.name = name;
-    if (startAt !== undefined) data.startAt = new Date(startAt);
-    if (endAt !== undefined) data.endAt = new Date(endAt);
+    if (name        !== undefined) data.name        = name;
+    if (startAt     !== undefined) data.startAt     = new Date(startAt);
+    if (endAt       !== undefined) data.endAt       = new Date(endAt);
     if (discountPct !== undefined) data.discountPct = parseInt(discountPct);
-    if (isActive !== undefined) data.isActive = isActive;
-    if (productIds !== undefined) data.productIds = JSON.stringify(productIds);
+    if (isActive    !== undefined) data.isActive    = isActive;
+    if (productIds  !== undefined) data.productIds  = JSON.stringify(productIds);
     const sale = await prisma.flashSale.update({ where: { id: parseInt(req.params.id) }, data });
     res.json(sale);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.delete('/flash-sales/:id', requireRole('MARKETING'), async (req, res) => {
+router.patch('/flash-sales/:id/toggle', requireRole('MARKETING', 'MODERATEUR'), async (req, res) => {
+  try {
+    const s = await prisma.flashSale.findUnique({ where: { id: parseInt(req.params.id) } });
+    const updated = await prisma.flashSale.update({ where: { id: s.id }, data: { isActive: !s.isActive } });
+    res.json(updated);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+router.delete('/flash-sales/:id', requireRole('MARKETING', 'MODERATEUR'), async (req, res) => {
   try {
     await prisma.flashSale.delete({ where: { id: parseInt(req.params.id) } });
-    res.json({ success: true });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Recherche de produits pour le sélecteur flash sale
+router.get('/flash-sales/products/search', async (req, res) => {
+  try {
+    const { q } = req.query;
+    const products = await prisma.product.findMany({
+      where: {
+        isActive: true,
+        OR: q ? [{ title: { contains: q } }, { brand: { contains: q } }] : undefined,
+      },
+      select: { id:true, title:true, brand:true, price:true, images:true, seller:{ select:{ name:true } } },
+      orderBy: { soldCount: 'desc' },
+      take: 20,
+    });
+    const parsed = products.map(p => ({
+      ...p,
+      images: typeof p.images === 'string' ? JSON.parse(p.images) : (p.images || []),
+    }));
+    res.json(parsed);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
