@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { adminApi } from '../api/adminClient';
 import { useAdmin } from '../context/AdminContext';
+import DocUpload from '../components/DocUpload';
 
 const BADGE_COLORS = {
   'Top Seller':'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
@@ -76,8 +77,19 @@ export default function AdminVendors({ initialTab, vendorId }) {
   const [newCommForm, setNewComm]       = useState({ type:'GLOBAL', rate:'', sellerId:'', categoryId:'' });
 
   // Create/Edit form
-  const emptyForm = { name:'', slug:'', logo:'🏪', color:'#2563EB', location:'Tunis, Tunisie', joinedYear: new Date().getFullYear(), responseTime:'sous 24 heures', badge:'Nouveau' };
+  const emptyForm = {
+    name:'', slug:'', logo:'🏪', color:'#2563EB', location:'Tunis, Tunisie',
+    joinedYear: new Date().getFullYear(), responseTime:'sous 24 heures', badge:'Nouveau',
+    email:'', phone:'',
+    // KYC légal
+    formeJuridique:'', rc:'', patente:'', adresseComplete:'',
+    gerant:'', cinGerant:'', qualiteSignataire:'Gérant',
+    banque:'', rib:'', categorieAutorisee:'',
+    // Documents
+    docCin:'', docRc:'', docPatente:'', docRib:'',
+  };
   const [form, setForm] = useState(emptyForm);
+  const setDoc = (key, url) => setForm(f => ({ ...f, [key]: url }));
 
   // Load data
   const loadVendors = useCallback(() => {
@@ -116,7 +128,7 @@ export default function AdminVendors({ initialTab, vendorId }) {
   const handleCreate = () => act(async () => {
     await adminApi.post('/vendors', { ...form, joinedYear: parseInt(form.joinedYear) });
     setCreateModal(false); setForm(emptyForm); loadVendors(); loadApps();
-  }, 'Vendeur créé avec succès');
+  }, 'Vendeur créé ✓');
 
   const handleEdit = () => act(async () => {
     // Pour l'instant on met à jour le badge et le slug
@@ -564,9 +576,119 @@ export default function AdminVendors({ initialTab, vendorId }) {
               </select>
             </Field>
           </div>
+          {/* ── Coordonnées de contact */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <Field label="Email professionnel">
+              <input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}
+                placeholder="contact@boutique.tn" className={inputCls} />
+            </Field>
+            <Field label="Téléphone">
+              <input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}
+                placeholder="+216 XX XXX XXX" className={inputCls} />
+            </Field>
+          </div>
+
+          {/* ── Section KYC légal */}
+          <div className="border-t border-slate-700 pt-4 mt-2 mb-4">
+            <div className="text-slate-300 text-sm font-semibold mb-3 flex items-center gap-2">
+              <span>📋</span> Informations légales (KYC)
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Forme juridique">
+                <select value={form.formeJuridique} onChange={e=>setForm({...form,formeJuridique:e.target.value})} className={inputCls}>
+                  <option value="">Sélectionner...</option>
+                  {['SARL','SA','EI','EURL','SNC','Auto-entrepreneur','Personne physique'].map(f=><option key={f}>{f}</option>)}
+                </select>
+              </Field>
+              <Field label="Catégorie de produits autorisée">
+                <input value={form.categorieAutorisee} onChange={e=>setForm({...form,categorieAutorisee:e.target.value})}
+                  placeholder="Ex: Électronique, Mode..." className={inputCls} />
+              </Field>
+              <Field label="Registre de Commerce (RC)">
+                <input value={form.rc} onChange={e=>setForm({...form,rc:e.target.value})}
+                  placeholder="RC-XXXXX-XXXX" className={inputCls} />
+              </Field>
+              <Field label="Patente n°">
+                <input value={form.patente} onChange={e=>setForm({...form,patente:e.target.value})}
+                  placeholder="N° patente" className={inputCls} />
+              </Field>
+              <Field label="Adresse complète du siège">
+                <input value={form.adresseComplete} onChange={e=>setForm({...form,adresseComplete:e.target.value})}
+                  placeholder="Rue, Ville, Code postal" className={inputCls} />
+              </Field>
+              <Field label="Gérant / Représentant légal">
+                <input value={form.gerant} onChange={e=>setForm({...form,gerant:e.target.value})}
+                  placeholder="Nom complet" className={inputCls} />
+              </Field>
+              <Field label="CIN du gérant">
+                <input value={form.cinGerant} onChange={e=>setForm({...form,cinGerant:e.target.value})}
+                  placeholder="00000000" className={inputCls} />
+              </Field>
+              <Field label="Qualité du signataire">
+                <input value={form.qualiteSignataire} onChange={e=>setForm({...form,qualiteSignataire:e.target.value})}
+                  placeholder="Gérant, Directeur Général..." className={inputCls} />
+              </Field>
+            </div>
+          </div>
+
+          {/* ── Informations bancaires */}
+          <div className="border-t border-slate-700 pt-4 mb-4">
+            <div className="text-slate-300 text-sm font-semibold mb-3 flex items-center gap-2">
+              <span>🏦</span> Coordonnées bancaires
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Banque">
+                <input value={form.banque} onChange={e=>setForm({...form,banque:e.target.value})}
+                  placeholder="BNA, Amen Bank, STB..." className={inputCls} />
+              </Field>
+              <Field label="RIB / IBAN">
+                <input value={form.rib} onChange={e=>setForm({...form,rib:e.target.value})}
+                  placeholder="TN59 0000 0000 0000 0000" className={inputCls} />
+              </Field>
+            </div>
+          </div>
+
+          {/* ── Upload des documents */}
+          <div className="border-t border-slate-700 pt-4 mb-5">
+            <div className="text-slate-300 text-sm font-semibold mb-1 flex items-center gap-2">
+              <span>📁</span> Documents justificatifs
+            </div>
+            <p className="text-slate-600 text-xs mb-4">
+              Formats acceptés : PDF, JPEG, PNG, WebP · 5 Mo max par fichier
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <DocUpload
+                label="CIN / Passeport du gérant"
+                value={form.docCin}
+                onChange={url => setDoc('docCin', url)}
+                required
+                hint="Recto-verso de la pièce d'identité"
+              />
+              <DocUpload
+                label="Registre de Commerce (RC)"
+                value={form.docRc}
+                onChange={url => setDoc('docRc', url)}
+                hint="Extrait RC en cours de validité"
+              />
+              <DocUpload
+                label="Patente"
+                value={form.docPatente}
+                onChange={url => setDoc('docPatente', url)}
+                hint="Attestation de patente fiscale"
+              />
+              <DocUpload
+                label="Relevé d'Identité Bancaire (RIB)"
+                value={form.docRib}
+                onChange={url => setDoc('docRib', url)}
+                required
+                hint="RIB officiel signé par la banque"
+              />
+            </div>
+          </div>
+
           {/* Preview */}
           <div className="bg-slate-900 rounded-xl p-4 mb-4 border border-slate-700">
-            <div className="text-slate-500 text-xs mb-2">Aperçu</div>
+            <div className="text-slate-500 text-xs mb-2">Aperçu boutique</div>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
                 style={{ background: form.color }}>
@@ -574,10 +696,13 @@ export default function AdminVendors({ initialTab, vendorId }) {
               </div>
               <div>
                 <div className="text-slate-200 font-semibold">{form.name || 'Nom du vendeur'}</div>
-                <div className="text-slate-500 text-xs">{form.location}</div>
-                <span className={`text-xs px-2 py-0.5 rounded-full mt-1 inline-block border ${BADGE_COLORS[form.badge] || 'bg-slate-700 text-slate-400 border-slate-600'}`}>
-                  {form.badge}
-                </span>
+                <div className="text-slate-500 text-xs">{form.adresseComplete || form.location}</div>
+                <div className="flex gap-2 mt-1 flex-wrap">
+                  <span className={`text-xs px-2 py-0.5 rounded-full border ${BADGE_COLORS[form.badge] || 'bg-slate-700 text-slate-400 border-slate-600'}`}>{form.badge}</span>
+                  {form.formeJuridique && <span className="text-xs text-slate-600">{form.formeJuridique}</span>}
+                  {form.docCin && <span className="text-xs text-green-400">✓ CIN</span>}
+                  {form.docRib && <span className="text-xs text-green-400">✓ RIB</span>}
+                </div>
               </div>
             </div>
           </div>
@@ -638,21 +763,54 @@ export default function AdminVendors({ initialTab, vendorId }) {
           )}
 
           {/* Info grid */}
-          <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="grid grid-cols-2 gap-3 mb-4">
             {[
               ['Slug', `/${detailVendor.slug}`],
-              ['Membre depuis', detailVendor.joinedYear],
-              ['Temps réponse', detailVendor.responseTime],
-              ['Rating', `★ ${detailVendor.rating} (${detailVendor.reviewsCount?.toLocaleString()} avis)`],
-              ['Produits actifs', detailVendor._count?.products ?? detailVendor.products?.length ?? 0],
-              ['Couleur', detailVendor.color],
-            ].map(([k,v]) => (
+              ['Forme juridique', detailVendor.formeJuridique],
+              ['RC', detailVendor.rc],
+              ['Patente', detailVendor.patente],
+              ['Gérant', detailVendor.gerant],
+              ['CIN Gérant', detailVendor.cinGerant],
+              ['Adresse', detailVendor.adresseComplete || detailVendor.location],
+              ['Email', detailVendor.email],
+              ['Téléphone', detailVendor.phone],
+              ['Banque', detailVendor.banque],
+              ['RIB', detailVendor.rib],
+              ['Catégorie autorisée', detailVendor.categorieAutorisee],
+            ].map(([k,v]) => v ? (
               <div key={k} className="bg-slate-900 rounded-lg p-3">
                 <div className="text-slate-500 text-xs">{k}</div>
-                <div className="text-slate-200 text-sm font-medium mt-0.5">{v || '—'}</div>
+                <div className="text-slate-200 text-sm font-medium mt-0.5 truncate">{v}</div>
               </div>
-            ))}
+            ) : null)}
           </div>
+
+          {/* Documents uploadés */}
+          {(detailVendor.docCin || detailVendor.docRc || detailVendor.docPatente || detailVendor.docRib) && (
+            <div className="mb-4">
+              <div className="text-slate-400 text-xs font-semibold mb-2 uppercase">Documents justificatifs</div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ['CIN / Passeport', detailVendor.docCin],
+                  ['Registre de Commerce', detailVendor.docRc],
+                  ['Patente', detailVendor.docPatente],
+                  ['RIB bancaire', detailVendor.docRib],
+                ].filter(([,url]) => url).map(([label, url]) => {
+                  const isPdf = url.endsWith('.pdf');
+                  return (
+                    <a key={label} href={url} target="_blank" rel="noreferrer"
+                      className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 transition group">
+                      <span className="text-xl flex-shrink-0">{isPdf ? '📄' : '🖼️'}</span>
+                      <div className="min-w-0">
+                        <div className="text-slate-300 text-xs font-medium truncate">{label}</div>
+                        <div className="text-green-400 text-[10px]">✓ Uploadé · Voir →</div>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Actions rapides */}
           {can('vendors.write') && (

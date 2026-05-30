@@ -8,6 +8,13 @@ const { adminAuth }  = require('../middleware/adminAuth');
 
 const UPLOADS_DIR = path.join(__dirname, '../../../uploads');
 
+// Types de fichiers acceptés pour les documents légaux (PDF inclus)
+const docFilter = (req, file, cb) => {
+  const allowed = ['image/jpeg','image/png','image/webp','application/pdf'];
+  if (allowed.includes(file.mimetype)) cb(null, true);
+  else cb(new Error('Format non supporté. Utilisez JPEG, PNG, WebP ou PDF.'));
+};
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const type = req.params.type || 'misc';
@@ -78,6 +85,37 @@ router.post('/banners', adminAuth, bannerUpload.single('image'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
   const url = `/uploads/banners/${req.file.filename}`;
   res.json({ url, filename: req.file.filename });
+}, (err, req, res, next) => {
+  res.status(400).json({ error: err.message });
+});
+
+// POST /api/upload/documents — documents légaux vendeur (PDF/image, 5Mo, admin ou seller)
+const docUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = path.join(UPLOADS_DIR, 'documents');
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  fileFilter: docFilter,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 Mo
+});
+
+router.post('/documents', (req, res, next) => {
+  // Accessible par admin ou seller connecté
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'Non authentifié' });
+  next();
+}, docUpload.single('file'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+  const url = `/uploads/documents/${req.file.filename}`;
+  const isPdf = req.file.mimetype === 'application/pdf';
+  res.json({ url, filename: req.file.filename, isPdf, originalName: req.file.originalname });
 }, (err, req, res, next) => {
   res.status(400).json({ error: err.message });
 });

@@ -63,6 +63,8 @@ router.post('/', requireRole('MODERATEUR'), async (req, res) => {
       // Infos légales
       formeJuridique, rc, patente, adresseComplete, gerant, cinGerant, qualiteSignataire,
       banque, rib, categorieAutorisee,
+      // Documents uploadés
+      docCin, docRc, docPatente, docRib,
       // Application
       companyName, taxId, bankAccount,
     } = req.body;
@@ -92,6 +94,10 @@ router.post('/', requireRole('MODERATEUR'), async (req, res) => {
         banque:            banque            || null,
         rib:               rib               || null,
         categorieAutorisee: categorieAutorisee || null,
+        docCin:            docCin            || null,
+        docRc:             docRc             || null,
+        docPatente:        docPatente        || null,
+        docRib:            docRib            || null,
       },
     });
     // Application vendeur

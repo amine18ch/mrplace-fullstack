@@ -70,6 +70,11 @@ model Seller {
   banque          String?
   rib             String?
   categorieAutorisee String?
+  // Documents uploadés
+  docCin          String?   // URL scan CIN/Passeport gérant
+  docRc           String?   // URL Registre de Commerce
+  docPatente      String?   // URL Patente
+  docRib          String?   // URL Relevé d'identité bancaire
   products        Product[]
   application     VendorApplication?
   paymentCycles   PaymentCycle[]
