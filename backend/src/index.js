@@ -61,6 +61,7 @@ app.use('/api/admin/customers', adminAuth, require('./routes/admin/customers'));
 app.use('/api/admin/finance',   adminAuth, require('./routes/admin/finance'));
 app.use('/api/admin/marketing', adminAuth, require('./routes/admin/marketing'));
 app.use('/api/admin/settings',    adminAuth, require('./routes/admin/settings'));
+app.use('/api/admin/contracts',   adminAuth, require('./routes/admin/contracts'));
 app.use('/api/admin/categories',  adminAuth, require('./routes/admin/categories'));
 app.use('/api/admin/attributes', adminAuth, require('./routes/admin/attributes'));
 app.use('/api/admin/returns',    adminAuth, require('./routes/admin/returns'));

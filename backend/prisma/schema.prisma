@@ -39,29 +39,41 @@ model Address {
 }
 
 model Seller {
-  id            Int       @id @default(autoincrement())
-  name          String
-  slug          String    @unique
-  logo          String
-  color         String    @default("#2563EB")
-  rating        Float     @default(4.5)
-  reviewsCount  Int       @default(0)
-  verified      Boolean   @default(false)
-  badge         String    @default("Nouveau")
-  location      String
-  joinedYear    Int
-  productsCount Int       @default(0)
-  responseTime  String    @default("sous 24 heures")
-  // Seller auth
-  email         String?   @unique
-  password      String?
-  phone         String?
-  description   String?
-  bannerColor   String?
-  isActive      Boolean   @default(true)
-  products      Product[]
-  application   VendorApplication?
-  paymentCycles PaymentCycle[]
+  id              Int       @id @default(autoincrement())
+  name            String
+  slug            String    @unique
+  logo            String
+  color           String    @default("#2563EB")
+  rating          Float     @default(4.5)
+  reviewsCount    Int       @default(0)
+  verified        Boolean   @default(false)
+  badge           String    @default("Nouveau")
+  location        String
+  joinedYear      Int
+  productsCount   Int       @default(0)
+  responseTime    String    @default("sous 24 heures")
+  // Auth
+  email           String?   @unique
+  password        String?
+  phone           String?
+  description     String?
+  bannerColor     String?
+  isActive        Boolean   @default(true)
+  // Informations légales / KYC
+  formeJuridique  String?
+  rc              String?
+  patente         String?
+  adresseComplete String?
+  gerant          String?
+  cinGerant       String?
+  qualiteSignataire String?
+  banque          String?
+  rib             String?
+  categorieAutorisee String?
+  products        Product[]
+  application     VendorApplication?
+  paymentCycles   PaymentCycle[]
+  contract        Contract?
 }
 
 model Category {
@@ -378,6 +390,37 @@ model PlatformSetting {
   value     String
   group     String   @default("GENERAL")
   updatedAt DateTime @updatedAt
+}
+
+model Contract {
+  id                   Int       @id @default(autoincrement())
+  seller               Seller    @relation(fields:[sellerId], references:[id])
+  sellerId             Int       @unique
+  ref                  String    @unique
+  status               String    @default("DRAFT")  // DRAFT | SENT | SIGNED | TERMINATED
+  // Conditions tarifaires
+  tauxCommission       Float     @default(10)
+  montantAbonnement    Float     @default(0)
+  tarifMiseEnAvant     Float     @default(0)
+  tauxRetenueSource    Float     @default(0)
+  frequenceVersement   String    @default("Mensuel")
+  seuilVersement       Float     @default(100)
+  delaiMiseEnDemeure   Int       @default(5)
+  delaiPreavisTarif    Int       @default(30)
+  delaiPreavisResiliation Int    @default(30)
+  delaiRegularisation  Int       @default(15)
+  delaiSoldeCompte     Int       @default(15)
+  dureeInitiale        Int       @default(12)
+  // Dates
+  dateDebut            DateTime?
+  dateSignatureClient  DateTime?
+  dateSignatureMarket  DateTime?
+  // Acceptation électronique
+  logAcceptanceRef     String?
+  signedByIp           String?
+  // Suivi
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 }
 
 model PaymentCycle {

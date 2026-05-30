@@ -54,27 +54,56 @@ router.delete('/commissions/:id', requireRole('COMPTABLE'), async (req, res) => 
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/admin/vendors - créer un nouveau vendeur
+// POST /api/admin/vendors - créer un nouveau vendeur avec toutes les infos légales
 router.post('/', requireRole('MODERATEUR'), async (req, res) => {
   try {
-    const { name, slug, logo, color, location, joinedYear, responseTime, badge } = req.body;
+    const {
+      name, slug, logo, color, location, joinedYear, responseTime, badge,
+      email, phone,
+      // Infos légales
+      formeJuridique, rc, patente, adresseComplete, gerant, cinGerant, qualiteSignataire,
+      banque, rib, categorieAutorisee,
+      // Application
+      companyName, taxId, bankAccount,
+    } = req.body;
     if (!name || !slug) return res.status(400).json({ error: 'Nom et slug requis' });
     const existing = await prisma.seller.findUnique({ where: { slug } });
     if (existing) return res.status(400).json({ error: 'Ce slug existe déjà' });
+
     const seller = await prisma.seller.create({
       data: {
-        name, slug: slug.toLowerCase().replace(/\s+/g, '-'),
+        name, slug: slug.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
         logo: logo || '🏪', color: color || '#2563EB',
-        location: location || 'Tunisie',
+        location: location || adresseComplete || 'Tunisie',
         joinedYear: parseInt(joinedYear) || new Date().getFullYear(),
         responseTime: responseTime || 'sous 24 heures',
         badge: badge || 'Nouveau',
         verified: false,
-      }
+        email: email || null,
+        phone: phone || null,
+        // KYC
+        formeJuridique:    formeJuridique    || null,
+        rc:                rc                || null,
+        patente:           patente           || null,
+        adresseComplete:   adresseComplete   || null,
+        gerant:            gerant            || null,
+        cinGerant:         cinGerant         || null,
+        qualiteSignataire: qualiteSignataire || null,
+        banque:            banque            || null,
+        rib:               rib               || null,
+        categorieAutorisee: categorieAutorisee || null,
+      },
     });
-    // Créer l'application vendeur
-    await prisma.vendorApplication.create({ data: { sellerId: seller.id, status: 'PENDING' } });
-    await logAction(req.admin.id, 'CREATE', 'vendors', seller.id, { name: seller.name }, req.ip);
+    // Application vendeur
+    await prisma.vendorApplication.create({
+      data: {
+        sellerId: seller.id, status: 'PENDING',
+        companyName: companyName || name,
+        taxId: taxId || null,
+        bankAccount: rib || bankAccount || null,
+      },
+    });
+    await logAction(req.admin.id, 'CREATE', 'vendors', seller.id, { name }, req.ip);
     res.json(seller);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
