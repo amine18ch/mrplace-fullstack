@@ -73,12 +73,19 @@ router.post('/payment-cycles/generate', async (req, res) => {
     const skipped = [];
 
     for (const seller of sellers) {
+      // Inclure TOUTES les commandes éligibles du vendeur
+      // Le filtre de période s'applique sur la DATE DE CRÉATION de la commande
+      // mais en mode force=true, on prend tout sans restriction de date
+      const dateFilter = force
+        ? {} // force: inclure toutes les commandes éligibles sans restriction de date
+        : { createdAt: { gte: periodStart, lte: periodEnd } }; // normal: mois en cours seulement
+
       const orderItems = await prisma.orderItem.findMany({
         where: {
           product: { sellerId: seller.id },
           order: {
             status: { in: eligibleStatuses },
-            updatedAt: { gte: periodStart, lte: periodEnd },
+            ...dateFilter,
           },
         },
       });
@@ -125,6 +132,40 @@ router.post('/payment-cycles/generate', async (req, res) => {
       statuses: eligibleStatuses,
       created, updated, skipped,
       message: `${created.length} créé(s), ${updated.length} mis à jour, ${skipped.length} ignoré(s)`,
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// GET /api/admin/finance/seller/:sellerId/orders — toutes les commandes éligibles d'un vendeur
+router.get('/seller/:sellerId/orders', async (req, res) => {
+  try {
+    const sellerId = parseInt(req.params.sellerId);
+    const { statuses = 'LIVREE,EXPEDIEE' } = req.query;
+    const eligibleStatuses = statuses.split(',');
+
+    const items = await prisma.orderItem.findMany({
+      where: {
+        product: { sellerId },
+        order: { status: { in: eligibleStatuses } },
+      },
+      include: {
+        order: { select: { id:true, status:true, createdAt:true, updatedAt:true } },
+        product: { select: { title:true } },
+      },
+      orderBy: { orderId: 'desc' },
+    });
+
+    const byOrder = {};
+    for (const item of items) {
+      const oid = item.orderId;
+      if (!byOrder[oid]) byOrder[oid] = { order: item.order, items: [], total: 0 };
+      byOrder[oid].items.push(item);
+      byOrder[oid].total += item.price * item.qty;
+    }
+
+    res.json({
+      orders: Object.values(byOrder),
+      grandTotal: Object.values(byOrder).reduce((s,o)=>s+o.total,0),
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });

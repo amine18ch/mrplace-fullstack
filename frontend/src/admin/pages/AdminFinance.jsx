@@ -351,8 +351,12 @@ export default function AdminFinance() {
                   className="accent-orange-500 w-4 h-4"
                 />
                 <div>
-                  <div className="text-slate-200 text-sm font-medium">🔄 Forcer le recalcul</div>
-                  <div className="text-slate-600 text-xs">Recalculer les cycles existants (non encore payés)</div>
+                  <div className="text-slate-200 text-sm font-medium">🔄 Forcer le recalcul (recommandé)</div>
+                  <div className="text-slate-600 text-xs">
+                    Inclut <strong>toutes</strong> les commandes éligibles sans restriction de date.
+                    Recalcule les cycles existants non encore payés.
+                    Utilisez cette option si des commandes manquent.
+                  </div>
                 </div>
               </label>
             </div>
