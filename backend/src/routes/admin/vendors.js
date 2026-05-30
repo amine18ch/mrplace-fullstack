@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
 const { adminAuth, requireRole, logAction } = require('../../middleware/adminAuth');
+const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 // GET /api/admin/vendors/applications
@@ -54,63 +55,84 @@ router.delete('/commissions/:id', requireRole('COMPTABLE'), async (req, res) => 
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/admin/vendors - créer un nouveau vendeur avec toutes les infos légales
+// POST /api/admin/vendors — créer un vendeur avec compte portail + KYC complet
 router.post('/', requireRole('MODERATEUR'), async (req, res) => {
   try {
     const {
       name, slug, logo, color, location, joinedYear, responseTime, badge,
-      email, phone,
-      // Infos légales
+      // Compte portail vendeur
+      email, password, phone,
+      // Infos légales KYC
       formeJuridique, rc, patente, adresseComplete, gerant, cinGerant, qualiteSignataire,
       banque, rib, categorieAutorisee,
-      // Documents uploadés
+      // Documents
       docCin, docRc, docPatente, docRib,
       // Application
       companyName, taxId, bankAccount,
     } = req.body;
+
     if (!name || !slug) return res.status(400).json({ error: 'Nom et slug requis' });
-    const existing = await prisma.seller.findUnique({ where: { slug } });
-    if (existing) return res.status(400).json({ error: 'Ce slug existe déjà' });
+    if (!email)         return res.status(400).json({ error: 'Email obligatoire pour le portail vendeur' });
+    if (!password || password.length < 6)
+                        return res.status(400).json({ error: 'Mot de passe minimum 6 caractères' });
+
+    const slugClean = slug.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const [existSlug, existEmail] = await Promise.all([
+      prisma.seller.findUnique({ where: { slug: slugClean } }),
+      prisma.seller.findUnique({ where: { email } }),
+    ]);
+    if (existSlug)  return res.status(400).json({ error: 'Ce slug existe déjà' });
+    if (existEmail) return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const seller = await prisma.seller.create({
       data: {
-        name, slug: slug.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        name, slug: slugClean,
         logo: logo || '🏪', color: color || '#2563EB',
         location: location || adresseComplete || 'Tunisie',
         joinedYear: parseInt(joinedYear) || new Date().getFullYear(),
         responseTime: responseTime || 'sous 24 heures',
         badge: badge || 'Nouveau',
         verified: false,
-        email: email || null,
+        isActive: true,
+        email,
+        password: hashedPassword,
         phone: phone || null,
         // KYC
-        formeJuridique:    formeJuridique    || null,
-        rc:                rc                || null,
-        patente:           patente           || null,
-        adresseComplete:   adresseComplete   || null,
-        gerant:            gerant            || null,
-        cinGerant:         cinGerant         || null,
-        qualiteSignataire: qualiteSignataire || null,
-        banque:            banque            || null,
-        rib:               rib               || null,
+        formeJuridique:     formeJuridique    || null,
+        rc:                 rc                || null,
+        patente:            patente           || null,
+        adresseComplete:    adresseComplete   || null,
+        gerant:             gerant            || null,
+        cinGerant:          cinGerant         || null,
+        qualiteSignataire:  qualiteSignataire || null,
+        banque:             banque            || null,
+        rib:                rib               || null,
         categorieAutorisee: categorieAutorisee || null,
-        docCin:            docCin            || null,
-        docRc:             docRc             || null,
-        docPatente:        docPatente        || null,
-        docRib:            docRib            || null,
+        docCin:             docCin            || null,
+        docRc:              docRc             || null,
+        docPatente:         docPatente        || null,
+        docRib:             docRib            || null,
       },
     });
+
     // Application vendeur
     await prisma.vendorApplication.create({
       data: {
-        sellerId: seller.id, status: 'PENDING',
+        sellerId:    seller.id,
+        status:      'PENDING',
         companyName: companyName || name,
-        taxId: taxId || null,
+        taxId:       taxId       || null,
         bankAccount: rib || bankAccount || null,
       },
     });
-    await logAction(req.admin.id, 'CREATE', 'vendors', seller.id, { name }, req.ip);
-    res.json(seller);
+
+    await logAction(req.admin.id, 'CREATE', 'vendors', seller.id, { name, email }, req.ip);
+
+    // Retourner le vendeur + les identifiants (mot de passe en clair pour info admin)
+    const { password: _, ...safeSeller } = seller;
+    res.json({ seller: safeSeller, credentials: { email, password, portalUrl: '/seller' } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

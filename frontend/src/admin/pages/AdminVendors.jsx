@@ -82,7 +82,7 @@ export default function AdminVendors({ initialTab, vendorId }) {
   const emptyForm = {
     name:'', slug:'', logo:'🏪', color:'#2563EB', location:'Tunis, Tunisie',
     joinedYear: new Date().getFullYear(), responseTime:'sous 24 heures', badge:'Nouveau',
-    email:'', phone:'',
+    email:'', password:'', phone:'',
     // KYC légal
     formeJuridique:'', rc:'', patente:'', adresseComplete:'',
     gerant:'', cinGerant:'', qualiteSignataire:'Gérant',
@@ -90,7 +90,8 @@ export default function AdminVendors({ initialTab, vendorId }) {
     // Documents
     docCin:'', docRc:'', docPatente:'', docRib:'',
   };
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm]             = useState(emptyForm);
+  const [credentials, setCredentials] = useState(null); // identifiants affichés après création
   const setDoc = (key, url) => setForm(f => ({ ...f, [key]: url }));
 
   // Load data
@@ -128,8 +129,11 @@ export default function AdminVendors({ initialTab, vendorId }) {
 
   // CRUD handlers
   const handleCreate = () => act(async () => {
-    await adminApi.post('/vendors', { ...form, joinedYear: parseInt(form.joinedYear) });
-    setCreateModal(false); setForm(emptyForm); loadVendors(); loadApps();
+    const res = await adminApi.post('/vendors', { ...form, joinedYear: parseInt(form.joinedYear) });
+    setCredentials(res.credentials); // afficher identifiants
+    setCreateModal(false);
+    setForm(emptyForm);
+    loadVendors(); loadApps();
   }, 'Vendeur créé ✓');
 
   const handleEdit = () => act(async () => {
@@ -572,16 +576,33 @@ export default function AdminVendors({ initialTab, vendorId }) {
               </select>
             </Field>
           </div>
-          {/* ── Coordonnées de contact */}
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <Field label="Email professionnel">
-              <input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}
-                placeholder="contact@boutique.tn" className={inputCls} />
-            </Field>
-            <Field label="Téléphone">
-              <input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}
-                placeholder="+216 XX XXX XXX" className={inputCls} />
-            </Field>
+          {/* ── Compte portail vendeur (obligatoire) */}
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4 mb-4">
+            <div className="text-blue-300 text-sm font-semibold mb-3 flex items-center gap-2">
+              🔑 Accès portail vendeur <span className="text-blue-500 text-xs font-normal">(obligatoire — permet au vendeur de gérer sa boutique)</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Email de connexion" required>
+                <input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}
+                  placeholder="vendeur@boutique.tn" className={inputCls} />
+              </Field>
+              <Field label="Téléphone">
+                <input value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}
+                  placeholder="+216 XX XXX XXX" className={inputCls} />
+              </Field>
+              <Field label="Mot de passe initial" required>
+                <input type="text" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}
+                  placeholder="Min. 6 caractères" className={inputCls} />
+              </Field>
+              <div className="flex items-end">
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, password: Math.random().toString(36).slice(2, 10) + 'A1!' }))}
+                  className="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs rounded-lg transition">
+                  🎲 Générer un mot de passe
+                </button>
+              </div>
+            </div>
+            <p className="text-blue-500 text-xs mt-2">L'URL de connexion vendeur : <strong className="text-blue-400">{window.location.origin}/seller</strong></p>
           </div>
 
           {/* ── Section KYC légal */}
@@ -707,12 +728,65 @@ export default function AdminVendors({ initialTab, vendorId }) {
               className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition-colors">
               Annuler
             </button>
-            <button onClick={handleCreate} disabled={actionLoading || !form.name || !form.slug}
+            <button onClick={handleCreate}
+              disabled={actionLoading || !form.name || !form.slug || !form.email || !form.password || form.password.length < 6}
               className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-medium transition-colors">
-              {actionLoading ? 'Création...' : 'Créer le vendeur'}
+              {actionLoading ? 'Création...' : '✓ Créer le vendeur'}
             </button>
           </div>
         </Modal>
+      )}
+
+      {/* ─── MODAL: IDENTIFIANTS VENDEUR (après création) ─── */}
+      {credentials && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl border border-green-500/40 shadow-2xl w-full max-w-md">
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3 text-3xl">✅</div>
+                <h3 className="text-white font-bold text-lg">Vendeur créé avec succès !</h3>
+                <p className="text-slate-400 text-sm mt-1">Transmettez ces identifiants au vendeur</p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 space-y-3 mb-5">
+                <div>
+                  <div className="text-slate-500 text-xs uppercase font-semibold mb-1">URL de connexion</div>
+                  <a href={credentials.portalUrl} target="_blank" rel="noreferrer"
+                    className="text-blue-400 text-sm font-mono hover:underline">
+                    {window.location.origin}{credentials.portalUrl}
+                  </a>
+                </div>
+                <div>
+                  <div className="text-slate-500 text-xs uppercase font-semibold mb-1">Email</div>
+                  <div className="text-white font-mono text-sm bg-slate-800 px-3 py-2 rounded-lg select-all">{credentials.email}</div>
+                </div>
+                <div>
+                  <div className="text-slate-500 text-xs uppercase font-semibold mb-1">Mot de passe</div>
+                  <div className="text-white font-mono text-sm bg-slate-800 px-3 py-2 rounded-lg select-all">{credentials.password}</div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-xs text-yellow-400 mb-4">
+                ⚠️ Notez ces identifiants maintenant. Le mot de passe ne pourra pas être récupéré ultérieurement. Le vendeur peut le modifier depuis son espace.
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const text = `Accès portail vendeur MARKET\n\nURL : ${window.location.origin}${credentials.portalUrl}\nEmail : ${credentials.email}\nMot de passe : ${credentials.password}`;
+                    navigator.clipboard.writeText(text).catch(() => {});
+                  }}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-2.5 rounded-lg text-sm transition">
+                  📋 Copier
+                </button>
+                <button onClick={() => setCredentials(null)}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg text-sm font-medium transition">
+                  ✓ Compris, fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ─── MODAL: DÉTAIL VENDEUR ─── */}

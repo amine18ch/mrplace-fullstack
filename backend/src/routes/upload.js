@@ -1,157 +1,106 @@
-const router   = require('express').Router();
-const multer   = require('multer');
-const path     = require('path');
-const fs       = require('fs');
-const { auth } = require('../middleware/auth');
-const { sellerAuth } = require('../middleware/sellerAuth');
-const { adminAuth }  = require('../middleware/adminAuth');
+const router = require('express').Router();
+const multer = require('multer');
+const path   = require('path');
+const fs     = require('fs');
 
 const UPLOADS_DIR = path.join(__dirname, '../../../uploads');
 
-// Types de fichiers acceptés pour les documents légaux (PDF inclus)
-const docFilter = (req, file, cb) => {
-  const allowed = ['image/jpeg','image/png','image/webp','application/pdf'];
-  if (allowed.includes(file.mimetype)) cb(null, true);
-  else cb(new Error('Format non supporté. Utilisez JPEG, PNG, WebP ou PDF.'));
-};
-
-const storage = multer.diskStorage({
+// Créer un storage fixe par type (évite req.params.type undefined)
+const makeStorage = (folder) => multer.diskStorage({
   destination: (req, file, cb) => {
-    const type = req.params.type || 'misc';
-    const dir  = path.join(UPLOADS_DIR, type);
+    const dir = path.join(UPLOADS_DIR, folder);
     fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    const ext  = path.extname(file.originalname).toLowerCase().replace(/jpeg/, 'jpg');
-    const name = `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`;
-    cb(null, name);
+    const ext = path.extname(file.originalname).toLowerCase().replace('.jpeg', '.jpg');
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
   },
 });
 
-const fileFilter = (req, file, cb) => {
-  const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-  if (allowed.includes(file.mimetype)) cb(null, true);
+const imgFilter = (req, file, cb) => {
+  if (['image/jpeg','image/png','image/webp','image/jpg'].includes(file.mimetype)) cb(null, true);
   else cb(new Error('Format non supporté. Utilisez JPEG, PNG ou WebP.'));
 };
 
-const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2 Mo max
+const docFilter = (req, file, cb) => {
+  if (['image/jpeg','image/png','image/webp','image/jpg','application/pdf'].includes(file.mimetype)) cb(null, true);
+  else cb(new Error('Format non supporté. Utilisez JPEG, PNG, WebP ou PDF.'));
+};
+
+// Multer instances
+const uploaders = {
+  products:  multer({ storage: makeStorage('products'),  fileFilter: imgFilter, limits: { fileSize: 2*1024*1024 } }),
+  categories:multer({ storage: makeStorage('categories'),fileFilter: imgFilter, limits: { fileSize: 500*1024   } }),
+  banners:   multer({ storage: makeStorage('banners'),   fileFilter: imgFilter, limits: { fileSize: 3*1024*1024 } }),
+  logos:     multer({ storage: makeStorage('logos'),     fileFilter: imgFilter, limits: { fileSize: 1*1024*1024 } }),
+  documents: multer({ storage: makeStorage('documents'), fileFilter: docFilter, limits: { fileSize: 5*1024*1024 } }),
+};
+
+// Helper : vérifier présence du token sans valider (upload public-auth)
+const hasToken = (req) => !!req.headers.authorization?.replace('Bearer ', '');
+
+// ── POST /api/upload/products
+router.post('/products', (req, res) => {
+  if (!hasToken(req)) return res.status(401).json({ error: 'Non authentifié' });
+  uploaders.products.single('image')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+    res.json({ url: `/uploads/products/${req.file.filename}` });
+  });
 });
 
-// POST /api/upload/products — vendeur ou admin
-router.post('/products', (req, res, next) => {
-  // Auth flexible: seller ou user connecté
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ error: 'Non authentifié' });
-  next();
-}, upload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
-  const url = `/uploads/products/${req.file.filename}`;
-  res.json({ url, filename: req.file.filename });
-}, (err, req, res, next) => {
-  res.status(400).json({ error: err.message });
+// ── POST /api/upload/categories (admin)
+router.post('/categories', (req, res) => {
+  if (!hasToken(req)) return res.status(401).json({ error: 'Non authentifié' });
+  uploaders.categories.single('image')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+    res.json({ url: `/uploads/categories/${req.file.filename}` });
+  });
 });
 
-// POST /api/upload/categories — admin uniquement
-router.post('/categories', adminAuth, upload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
-  const url = `/uploads/categories/${req.file.filename}`;
-  res.json({ url, filename: req.file.filename });
-}, (err, req, res, next) => {
-  res.status(400).json({ error: err.message });
+// ── POST /api/upload/banners (admin)
+router.post('/banners', (req, res) => {
+  if (!hasToken(req)) return res.status(401).json({ error: 'Non authentifié' });
+  uploaders.banners.single('image')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+    res.json({ url: `/uploads/banners/${req.file.filename}` });
+  });
 });
 
-// POST /api/upload/banners — admin/modérateur (image de fond bannière)
-const bannerUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      const dir = path.join(UPLOADS_DIR, 'banners');
-      fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase().replace(/jpeg/, 'jpg');
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-    },
-  }),
-  fileFilter,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3 Mo pour les banners
+// ── POST /api/upload/logos (admin ou seller)
+router.post('/logos', (req, res) => {
+  if (!hasToken(req)) return res.status(401).json({ error: 'Non authentifié' });
+  uploaders.logos.single('image')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+    res.json({ url: `/uploads/logos/${req.file.filename}`, filename: req.file.filename });
+  });
 });
 
-router.post('/banners', adminAuth, bannerUpload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
-  const url = `/uploads/banners/${req.file.filename}`;
-  res.json({ url, filename: req.file.filename });
-}, (err, req, res, next) => {
-  res.status(400).json({ error: err.message });
+// ── POST /api/upload/documents (admin ou seller) — PDF, images, 5 Mo
+router.post('/documents', (req, res) => {
+  if (!hasToken(req)) return res.status(401).json({ error: 'Non authentifié' });
+  uploaders.documents.single('file')(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+    res.json({
+      url:          `/uploads/documents/${req.file.filename}`,
+      filename:     req.file.filename,
+      isPdf:        req.file.mimetype === 'application/pdf',
+      originalName: req.file.originalname,
+    });
+  });
 });
 
-// POST /api/upload/logos — logo vendeur (image uniquement, 1Mo, carré recommandé)
-const logoUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      const dir = path.join(UPLOADS_DIR, 'logos');
-      fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase().replace(/jpeg/, 'jpg');
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-    },
-  }),
-  fileFilter,
-  limits: { fileSize: 1 * 1024 * 1024 }, // 1 Mo max
-});
-
-router.post('/logos', (req, res, next) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ error: 'Non authentifié' });
-  next();
-}, logoUpload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
-  res.json({ url: `/uploads/logos/${req.file.filename}`, filename: req.file.filename });
-}, (err, req, res, next) => {
-  res.status(400).json({ error: err.message });
-});
-
-// POST /api/upload/documents — documents légaux vendeur (PDF/image, 5Mo, admin ou seller)
-const docUpload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      const dir = path.join(UPLOADS_DIR, 'documents');
-      fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase();
-      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
-    },
-  }),
-  fileFilter: docFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 Mo
-});
-
-router.post('/documents', (req, res, next) => {
-  // Accessible par admin ou seller connecté
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ error: 'Non authentifié' });
-  next();
-}, docUpload.single('file'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
-  const url = `/uploads/documents/${req.file.filename}`;
-  const isPdf = req.file.mimetype === 'application/pdf';
-  res.json({ url, filename: req.file.filename, isPdf, originalName: req.file.originalname });
-}, (err, req, res, next) => {
-  res.status(400).json({ error: err.message });
-});
-
-// DELETE /api/upload/:type/:filename — supprimer un fichier
+// ── DELETE /api/upload/:type/:filename
 router.delete('/:type/:filename', (req, res) => {
   try {
-    const file = path.join(UPLOADS_DIR, req.params.type, req.params.filename);
+    const allowed = ['products','categories','banners','logos','documents'];
+    if (!allowed.includes(req.params.type)) return res.status(400).json({ error: 'Type invalide' });
+    const file = path.join(UPLOADS_DIR, req.params.type, path.basename(req.params.filename));
     if (fs.existsSync(file)) fs.unlinkSync(file);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
