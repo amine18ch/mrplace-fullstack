@@ -65,7 +65,7 @@ router.post('/', auth, async (req, res) => {
         promoCode: promoCode?.toUpperCase() || null,
         shippingAddress: JSON.stringify(shippingAddress),
         paymentMethod,
-        items: { create: orderItems.map(it => ({ ...it, variant: JSON.stringify(it.variant) })) },
+        items: { create: orderItems.map(({ _flashApplied, _originalPrice, ...it }) => ({ ...it, variant: JSON.stringify(it.variant) })) },
       },
       include: { items: { include: { product: true } } },
     });
