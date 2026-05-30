@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { productsApi, sellersApi, ordersApi, messagesApi, returnsApi } from '../api/client';
+import SellerLogo from '../components/SellerLogo';
 import { useApp } from '../context/AppContext';
 import ProductCard from '../components/ProductCard';
 import { fmt, Stars, SkeletonCard, Spinner } from '../components/ui';
@@ -90,9 +91,9 @@ export const SellerPage = ({ slug }) => {
     <div>
       <div className="py-12" style={{ background: `linear-gradient(135deg, ${bannerBg}, ${seller.color || bannerBg})` }}>
         <div className={`max-w-[1400px] mx-auto px-4 flex items-center gap-6 ${textClass}`}>
-          <div className="w-28 h-28 rounded-full flex items-center justify-center text-6xl shadow-2xl border-4 border-white/30"
+          <div className="w-28 h-28 rounded-full overflow-hidden flex items-center justify-center shadow-2xl border-4 border-white/30"
             style={{ background: seller.color || '#2563EB' }}>
-            {seller.logo}
+            <SellerLogo src={seller.logo} size={112} />
           </div>
           <div className="flex-1">
             <h1 className="text-4xl font-extrabold flex items-center gap-3">{seller.name}

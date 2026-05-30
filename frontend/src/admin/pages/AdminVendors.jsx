@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { adminApi } from '../api/adminClient';
 import { useAdmin } from '../context/AdminContext';
 import DocUpload from '../components/DocUpload';
+import LogoUpload from '../../components/LogoUpload';
+import { getAdminToken } from '../api/adminClient';
 
 const BADGE_COLORS = {
   'Top Seller':'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
@@ -535,19 +537,13 @@ export default function AdminVendors({ initialTab, vendorId }) {
               <input value={form.slug} onChange={e => setForm({...form, slug: e.target.value})}
                 placeholder="techhub-store" className={inputCls} />
             </Field>
-            <Field label="Logo (emoji)">
-              <div className="flex gap-2 items-center">
-                <input value={form.logo} onChange={e => setForm({...form, logo: e.target.value})}
-                  className={`${inputCls} w-20 text-center text-2xl`} maxLength={2} />
-                <div className="flex flex-wrap gap-1">
-                  {EMOJI_OPTIONS.slice(0,8).map(e => (
-                    <button key={e} onClick={() => setForm({...form, logo: e})}
-                      className={`text-xl p-1 rounded hover:bg-slate-700 transition-colors ${form.logo===e ? 'bg-slate-700 ring-1 ring-blue-500' : ''}`}>
-                      {e}
-                    </button>
-                  ))}
-                </div>
-              </div>
+            <Field label="Logo (emoji ou photo)">
+              <LogoUpload
+                value={form.logo}
+                onChange={v => setForm({...form, logo: v})}
+                color={form.color}
+                tokenGetter={getAdminToken}
+              />
             </Field>
             <Field label="Couleur de fond">
               <div className="flex gap-2 items-center">

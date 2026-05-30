@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSeller } from '../context/SellerContext';
+import SellerLogo from '../../components/SellerLogo';
 
 const NAV = [
   { id:'dashboard', label:'Tableau de bord', icon:'M3 12L12 3l9 9M5 10v10h14V10' },
@@ -26,9 +27,9 @@ const SidebarContent = ({ seller, page, navigate, notifications, logout, onClose
       {/* Store info */}
       <div className="p-5 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-full flex items-center justify-center text-2xl flex-shrink-0"
+          <div className="w-11 h-11 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
             style={{ background: seller?.color || '#2563EB' }}>
-            {seller?.logo || '🏪'}
+            <SellerLogo src={seller?.logo} size={44} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-white font-bold text-sm truncate">{seller?.name}</div>
@@ -122,9 +123,9 @@ export default function SellerLayout({ children }) {
             {NAV.find(n => n.id === page)?.label || 'Tableau de bord'}
           </h1>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
               style={{ background: seller?.color || '#2563EB' }}>
-              {seller?.logo || seller?.name?.[0] || 'V'}
+              <SellerLogo src={seller?.logo || seller?.name?.[0] || 'V'} size={32} />
             </div>
             <div className="hidden sm:block">
               <div className="text-slate-200 text-xs font-medium">{seller?.name}</div>

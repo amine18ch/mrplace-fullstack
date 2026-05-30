@@ -89,6 +89,34 @@ router.post('/banners', adminAuth, bannerUpload.single('image'), (req, res) => {
   res.status(400).json({ error: err.message });
 });
 
+// POST /api/upload/logos — logo vendeur (image uniquement, 1Mo, carré recommandé)
+const logoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const dir = path.join(UPLOADS_DIR, 'logos');
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase().replace(/jpeg/, 'jpg');
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  fileFilter,
+  limits: { fileSize: 1 * 1024 * 1024 }, // 1 Mo max
+});
+
+router.post('/logos', (req, res, next) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'Non authentifié' });
+  next();
+}, logoUpload.single('image'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+  res.json({ url: `/uploads/logos/${req.file.filename}`, filename: req.file.filename });
+}, (err, req, res, next) => {
+  res.status(400).json({ error: err.message });
+});
+
 // POST /api/upload/documents — documents légaux vendeur (PDF/image, 5Mo, admin ou seller)
 const docUpload = multer({
   storage: multer.diskStorage({

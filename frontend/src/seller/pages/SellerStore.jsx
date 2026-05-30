@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { sellerApi } from '../api/sellerClient';
+import { sellerApi, getSellerToken } from '../api/sellerClient';
 import { useSeller } from '../context/SellerContext';
+import LogoUpload from '../../components/LogoUpload';
 
 const EMOJIS = ['🏪','💻','👗','🏠','💄','⚽','🧸','🛒','🚗','📱','🍕','🎮','📚','🌿','💎','🍵','☕','🎨','🔧','🏋️'];
 const COLORS = ['#2563EB','#7C3AED','#DB2777','#DC2626','#D97706','#059669','#0891B2','#0F172A','#6B7280','#1E293B'];
@@ -84,9 +85,12 @@ export default function SellerStore({ initialTab = 'profil' }) {
           <div className="rounded-xl overflow-hidden mb-6 border border-slate-800">
             <div className="h-24 flex items-end px-5 pb-0" style={{ background: form.bannerColor || form.color || '#2563EB' }}>
               <div className="mb-0 transform translate-y-6">
-                <div className="w-16 h-16 rounded-full border-4 border-slate-900 flex items-center justify-center text-3xl shadow-xl"
+                <div className="w-16 h-16 rounded-full border-4 border-slate-900 overflow-hidden flex items-center justify-center shadow-xl"
                   style={{ background: form.color || '#2563EB' }}>
-                  {form.logo}
+                  {(form.logo?.startsWith('/') || form.logo?.startsWith('http'))
+                    ? <img src={form.logo} alt="logo" className="w-full h-full object-cover" />
+                    : <span className="text-3xl">{form.logo || '🏪'}</span>
+                  }
                 </div>
               </div>
             </div>
@@ -122,22 +126,15 @@ export default function SellerStore({ initialTab = 'profil' }) {
               rows={3} className={`${inputCls} resize-none`} placeholder="Décrivez votre boutique, vos spécialités..." />
           </div>
 
-          {/* Logo */}
+          {/* Logo emoji ou photo */}
           <div className="mb-4">
-            <label className="text-slate-400 text-xs font-medium mb-1.5 block">Logo (emoji)</label>
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center text-3xl border border-slate-700" style={{background:form.color}}>
-                {form.logo}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {EMOJIS.map(e => (
-                  <button key={e} type="button" onClick={() => setForm({...form,logo:e})}
-                    className={`text-2xl p-1.5 rounded-lg hover:bg-slate-800 ${form.logo===e?'bg-slate-800 ring-2 ring-blue-500':''}`}>
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <label className="text-slate-400 text-xs font-medium mb-1.5 block">Logo (emoji ou photo)</label>
+            <LogoUpload
+              value={form.logo}
+              onChange={v => setForm({...form, logo: v})}
+              color={form.color}
+              tokenGetter={getSellerToken}
+            />
           </div>
 
           {/* Couleur principale */}
