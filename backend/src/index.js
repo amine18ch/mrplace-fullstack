@@ -61,6 +61,9 @@ app.use('/api/admin/customers', adminAuth, require('./routes/admin/customers'));
 app.use('/api/admin/finance',   adminAuth, require('./routes/admin/finance'));
 app.use('/api/admin/marketing', adminAuth, require('./routes/admin/marketing'));
 app.use('/api/admin/settings',    adminAuth, require('./routes/admin/settings'));
+// Route HTML du contrat SANS adminAuth (iframe ne peut pas envoyer de header)
+// Le token est validé via query param ?token=...
+app.get('/api/admin/contracts/:id/html', require('./routes/admin/contract-html'));
 app.use('/api/admin/contracts',   adminAuth, require('./routes/admin/contracts'));
 app.use('/api/admin/categories',  adminAuth, require('./routes/admin/categories'));
 app.use('/api/admin/attributes', adminAuth, require('./routes/admin/attributes'));
