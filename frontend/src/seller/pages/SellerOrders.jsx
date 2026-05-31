@@ -83,11 +83,22 @@ export default function SellerOrders() {
             <div key={o.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-slate-300 font-mono text-sm font-bold">#{String(o.id).padStart(4,'0')}</span>
+                    {/* Statut global de la commande */}
                     <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[o.status]||'bg-slate-700 text-slate-400'}`}>
                       {STATUS_LABELS[o.status]||o.status}
                     </span>
+                    {/* Statut d'expédition propre à CE vendeur */}
+                    {o.fulfillments?.[0] && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${
+                        o.fulfillments[0].status === 'EXPEDIEE' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' :
+                        o.fulfillments[0].status === 'EN_PREPARATION' ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' :
+                        'bg-slate-700 text-slate-500 border-slate-600'
+                      }`}>
+                        Mon exp. : {STATUS_LABELS[o.fulfillments[0].status] || o.fulfillments[0].status}
+                      </span>
+                    )}
                   </div>
                   <div className="text-slate-500 text-xs mt-1">
                     {o.user?.name || 'Client'} — {fmtDate(o.createdAt)}
@@ -184,47 +195,64 @@ export default function SellerOrders() {
                 </div>
               </div>
 
-              {/* Changer statut */}
-              {['CONFIRMEE', 'EN_ATTENTE', 'EN_PREPARATION'].includes(selected.status) && (
-                <div className="bg-slate-900 rounded-xl p-4">
-                  <div className="text-slate-400 text-xs font-semibold mb-1">FAIRE AVANCER LA COMMANDE</div>
-                  <p className="text-slate-600 text-xs mb-3">
-                    Statut actuel : <span className={`font-semibold ${STATUS_COLORS[selected.status]?.replace('bg-','text-').split(' ')[0] || 'text-slate-400'}`}>{STATUS_LABELS[selected.status]}</span>
-                  </p>
-                  {/* Statuts disponibles — exclure le statut actuel */}
-                  <div className="space-y-2 mb-3">
-                    {['EN_PREPARATION', 'EXPEDIEE']
-                      .filter(s => s !== selected.status) // ne jamais proposer le statut actuel
-                      .map(s => (
-                        <button key={s} onClick={() => setNewStatus(s)}
-                          className={`w-full flex items-center gap-3 py-3 px-4 rounded-xl text-sm font-medium border transition-all ${
-                            newStatus === s
-                              ? 'border-blue-500 bg-blue-500/20 text-blue-300'
-                              : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-500'
-                          }`}>
-                          <span className="text-xl">{s === 'EN_PREPARATION' ? '🔧' : '🚚'}</span>
-                          <div className="text-left">
-                            <div>{STATUS_LABELS[s]}</div>
-                            <div className="text-xs opacity-60">{s === 'EN_PREPARATION' ? 'Vous préparez les articles' : 'Colis remis au transporteur'}</div>
-                          </div>
-                          {newStatus === s && <span className="ml-auto text-blue-400">✓</span>}
+              {/* Mon statut d'expédition (indépendant des autres vendeurs) */}
+              {(() => {
+                const myFulfillment = selected.fulfillments?.[0];
+                const myStatus = myFulfillment?.status || 'EN_ATTENTE';
+                const canChange = !['EXPEDIEE','LIVREE'].includes(myStatus) || !myFulfillment;
+                const availableStatuses = ['EN_PREPARATION','EXPEDIEE'].filter(s => s !== myStatus);
+                return (
+                  <div className="bg-slate-900 rounded-xl p-4">
+                    <div className="text-slate-400 text-xs font-semibold mb-2">MON EXPÉDITION (indépendante des autres vendeurs)</div>
+                    {myFulfillment && (
+                      <div className="mb-3 flex items-center gap-2">
+                        <span className="text-slate-500 text-xs">Mon statut actuel :</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                          myStatus === 'EXPEDIEE' ? 'bg-purple-500/20 text-purple-400' :
+                          myStatus === 'EN_PREPARATION' ? 'bg-indigo-500/20 text-indigo-400' :
+                          'bg-slate-700 text-slate-400'
+                        }`}>{STATUS_LABELS[myStatus] || myStatus}</span>
+                        {myFulfillment.trackingNumber && (
+                          <span className="text-slate-600 text-xs">N° suivi : {myFulfillment.trackingNumber}</span>
+                        )}
+                      </div>
+                    )}
+                    {canChange ? (
+                      <>
+                        <div className="space-y-2 mb-3">
+                          {availableStatuses.map(s => (
+                            <button key={s} onClick={() => setNewStatus(s)}
+                              className={`w-full flex items-center gap-3 py-3 px-4 rounded-xl text-sm font-medium border transition-all ${
+                                newStatus === s ? 'border-blue-500 bg-blue-500/20 text-blue-300' : 'border-slate-700 bg-slate-800 text-slate-300 hover:border-slate-500'
+                              }`}>
+                              <span className="text-xl">{s === 'EN_PREPARATION' ? '🔧' : '🚚'}</span>
+                              <div className="text-left">
+                                <div>{STATUS_LABELS[s]}</div>
+                                <div className="text-xs opacity-60">{s === 'EN_PREPARATION' ? 'Je prépare mes articles' : 'Mon colis est remis au transporteur'}</div>
+                              </div>
+                              {newStatus === s && <span className="ml-auto text-blue-400">✓</span>}
+                            </button>
+                          ))}
+                        </div>
+                        {newStatus === 'EXPEDIEE' && (
+                          <input value={trackingNum} onChange={e => setTracking(e.target.value)}
+                            placeholder="Mon numéro de suivi (optionnel)"
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 mb-3"
+                          />
+                        )}
+                        <button onClick={handleStatusUpdate} disabled={!newStatus || actionLoading}
+                          className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-semibold transition-colors">
+                          {actionLoading ? 'Mise à jour...' : newStatus ? `✓ Marquer "${STATUS_LABELS[newStatus]}"` : 'Sélectionnez votre statut'}
                         </button>
-                      ))
-                    }
+                      </>
+                    ) : (
+                      <div className="text-center py-3 text-green-400 text-sm">
+                        ✓ Vous avez déjà expédié votre partie de cette commande
+                      </div>
+                    )}
                   </div>
-                  {newStatus === 'EXPEDIEE' && (
-                    <input value={trackingNum} onChange={e => setTracking(e.target.value)}
-                      placeholder="Numéro de suivi transporteur (optionnel)"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-slate-200 text-sm placeholder-slate-500 focus:outline-none focus:border-blue-500 mb-3"
-                    />
-                  )}
-                  <button onClick={handleStatusUpdate}
-                    disabled={!newStatus || actionLoading}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white py-3 rounded-xl text-sm font-semibold transition-colors">
-                    {actionLoading ? 'Mise à jour...' : newStatus ? `✓ Passer en "${STATUS_LABELS[newStatus]}"` : 'Sélectionnez un statut ci-dessus'}
-                  </button>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         </div>

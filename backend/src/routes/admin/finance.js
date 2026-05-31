@@ -89,14 +89,36 @@ router.post('/payment-cycles/generate', async (req, res) => {
         ? {} // pas de filtre de date — les cycles payés sont exclus ci-dessus
         : { createdAt: { gte: periodStart, lte: periodEnd } };
 
+      // Trouver les ordres où CE VENDEUR a expédié (via OrderFulfillment)
+      // + les ordres encore sans fulfillment mais avec statut éligible (anciennes commandes)
+      const fulfilledOrderIds = await prisma.orderFulfillment.findMany({
+        where: {
+          sellerId: seller.id,
+          status: { in: eligibleStatuses },
+        },
+        select: { orderId: true },
+      });
+      const fulfilledIds = fulfilledOrderIds.map(f => f.orderId);
+
+      // Commandes globales éligibles sans fulfillment (mode compatibilité)
+      const globalEligible = await prisma.order.findMany({
+        where: {
+          status: { in: eligibleStatuses },
+          fulfillments: { none: {} }, // pas encore de fulfillment créé
+          ...dateFilter,
+          ...excludePaidPeriods,
+        },
+        select: { id: true },
+      });
+      const globalIds = globalEligible.map(o => o.id);
+
+      const allEligibleOrderIds = [...new Set([...fulfilledIds, ...globalIds])];
+
       const orderItems = await prisma.orderItem.findMany({
         where: {
           product: { sellerId: seller.id },
-          order: {
-            status: { in: eligibleStatuses },
-            ...dateFilter,
-            ...excludePaidPeriods, // ← toujours exclure les commandes des cycles payés
-          },
+          orderId: { in: allEligibleOrderIds },
+          order: { ...excludePaidPeriods },
         },
       });
 

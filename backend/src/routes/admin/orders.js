@@ -94,7 +94,8 @@ router.get('/', async (req, res) => {
         where, skip, take: parseInt(limit),
         include: {
           user: { select: { name: true, email: true } },
-          items: { include: { product: { include: { seller: { select: { name: true } } } } } }
+          items: { include: { product: { include: { seller: { select: { id:true, name:true, logo:true, slug:true } } } } } },
+          fulfillments: true,
         },
         orderBy: { createdAt: 'desc' }
       }),

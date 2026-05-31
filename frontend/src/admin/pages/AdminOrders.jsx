@@ -196,7 +196,19 @@ export default function AdminOrders() {
                       <td className="px-4 py-3 text-blue-400 font-medium">{fmt(o.total)} TND</td>
                       <td className="px-4 py-3 text-slate-300 text-center">{o.items?.length || 0}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[o.status] || 'bg-slate-700 text-slate-400'}`}>{o.status}</span>
+                        <div className="flex flex-col gap-1">
+                          <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[o.status] || 'bg-slate-700 text-slate-400'}`}>{o.status}</span>
+                          {o.fulfillments?.length > 0 && (() => {
+                            const shipped = o.fulfillments.filter(f => ['EXPEDIEE','LIVREE'].includes(f.status)).length;
+                            const tot     = o.fulfillments.length;
+                            if (shipped === 0) return null;
+                            return (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${shipped === tot ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                                🚚 {shipped}/{tot} expédié{shipped > 1 ? 's' : ''}
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-slate-500 text-xs">{fmtDate(o.createdAt)}</td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>

@@ -81,6 +81,25 @@ router.post('/', auth, async (req, res) => {
     // Vider panier
     await prisma.cartItem.deleteMany({ where: { userId: req.user.id } });
 
+    // Créer un OrderFulfillment par vendeur impliqué dans la commande
+    const sellerIds = [...new Set(orderItems.map(i => {
+      // Retrouver le sellerId depuis les produits
+      return null; // sera fait ci-dessous
+    }).filter(Boolean))];
+    // Récupérer les sellerIds réels depuis les produits
+    const productSellerMap = {};
+    for (const item of orderItems) {
+      const prod = await prisma.product.findUnique({ where: { id: item.productId }, select: { sellerId: true } });
+      if (prod) productSellerMap[prod.sellerId] = true;
+    }
+    for (const sid of Object.keys(productSellerMap)) {
+      await prisma.orderFulfillment.upsert({
+        where: { orderId_sellerId: { orderId: order.id, sellerId: parseInt(sid) } },
+        create: { orderId: order.id, sellerId: parseInt(sid), status: 'EN_ATTENTE' },
+        update: {},
+      });
+    }
+
     // Créer l'événement initial (avec note si prix flash appliqué)
     const flashItems = orderItems.filter(i => i._flashApplied);
     const flashNote = activeFlashSale && flashItems.length

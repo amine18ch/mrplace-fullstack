@@ -29,6 +29,7 @@ router.get('/', async (req, res) => {
         include: {
           items: { where: { product: { sellerId: req.seller.id } }, include: { product: { select: { id:true, title:true, images:true, price:true } } } },
           user:  { select: { id:true, name:true, email:true, phone:true } },
+          fulfillments: { where: { sellerId: req.seller.id } },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -62,6 +63,7 @@ router.get('/:id', async (req, res) => {
       include: {
         items: { where: { product: { sellerId: req.seller.id } }, include: { product: { select: { title:true, images:true, price:true, brand:true } } } },
         user:  { select: { name:true, email:true, phone:true } },
+        fulfillments: { where: { sellerId: req.seller.id } },
       },
     });
     if (!order) return res.status(404).json({ error: 'Commande introuvable' });
@@ -71,30 +73,59 @@ router.get('/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// PATCH /api/seller/orders/:id/status
+// PATCH /api/seller/orders/:id/status — met à jour l'expédition du vendeur (OrderFulfillment)
 router.patch('/:id/status', async (req, res) => {
   try {
     const { status, trackingNumber, note } = req.body;
     const ALLOWED = ['EN_PREPARATION', 'EXPEDIEE'];
     if (!ALLOWED.includes(status)) return res.status(400).json({ error: `Statut autorisé: ${ALLOWED.join(', ')}` });
 
-    const order = await prisma.order.findFirst({
-      where: { id: parseInt(req.params.id), items: { some: { product: { sellerId: req.seller.id } } } },
+    const orderId = parseInt(req.params.id);
+
+    // Vérifier que ce vendeur a bien des produits dans cette commande
+    const hasItems = await prisma.orderItem.findFirst({
+      where: { orderId, product: { sellerId: req.seller.id } },
     });
-    if (!order) return res.status(404).json({ error: 'Commande introuvable' });
+    if (!hasItems) return res.status(404).json({ error: 'Commande introuvable' });
 
-    const data = { status };
-    if (trackingNumber) data.trackingNumber = trackingNumber;
+    // Mettre à jour (ou créer) le fulfillment de CE vendeur uniquement
+    const fulfillment = await prisma.orderFulfillment.upsert({
+      where: { orderId_sellerId: { orderId, sellerId: req.seller.id } },
+      create: { orderId, sellerId: req.seller.id, status, trackingNumber: trackingNumber || null, note: note || '' },
+      update: { status, trackingNumber: trackingNumber || null, note: note || '' },
+    });
 
-    const updated = await prisma.order.update({ where: { id: order.id }, data });
+    // Ajouter un événement sur la commande
+    const order = await prisma.order.findUnique({ where: { id: orderId }, select: { userId: true } });
     await prisma.orderEvent.create({
-      data: { orderId: order.id, status, note: note || '', createdBy: `SELLER:${req.seller.id}` },
+      data: {
+        orderId,
+        status,
+        note: `${req.seller.name}: ${note || ''}${trackingNumber ? ` (suivi: ${trackingNumber})` : ''}`,
+        createdBy: `SELLER:${req.seller.id}`,
+      },
     });
-    // Notify client
+
+    // Notifier le client
+    const statusLabel = { EN_PREPARATION: 'en préparation', EXPEDIEE: 'expédiée par le vendeur' }[status] || status;
     await prisma.notification.create({
-      data: { userId: order.userId, type: 'ORDER_UPDATE', title: 'Commande mise à jour', message: `Votre commande #${String(order.id).padStart(4,'0')} est maintenant "${status}"`, link: '/orders' },
+      data: {
+        userId: order.userId,
+        type: 'ORDER_UPDATE',
+        title: 'Mise à jour de votre commande',
+        message: `La partie de votre commande chez "${req.seller.name}" est ${statusLabel}`,
+        link: '/orders',
+      },
     });
-    res.json(updated);
+
+    // Si TOUS les vendeurs ont expédié → passer l'ordre global en EXPEDIEE
+    const allFulfillments = await prisma.orderFulfillment.findMany({ where: { orderId } });
+    const allShipped = allFulfillments.length > 0 && allFulfillments.every(f => ['EXPEDIEE','LIVREE'].includes(f.status));
+    if (allShipped && status === 'EXPEDIEE') {
+      await prisma.order.update({ where: { id: orderId }, data: { status: 'EXPEDIEE' } });
+    }
+
+    res.json({ fulfillment, allShipped });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
