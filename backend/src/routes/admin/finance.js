@@ -73,12 +73,21 @@ router.post('/payment-cycles/generate', async (req, res) => {
     const skipped = [];
 
     for (const seller of sellers) {
-      // Inclure TOUTES les commandes éligibles du vendeur
-      // Le filtre de période s'applique sur la DATE DE CRÉATION de la commande
-      // mais en mode force=true, on prend tout sans restriction de date
+      // ── Récupérer les périodes DÉJÀ PAYÉES pour ce vendeur
+      // Ces commandes sont exclues du recalcul (même avec force=true)
+      const paidCycles = await prisma.paymentCycle.findMany({
+        where: { sellerId: seller.id, status: 'PAID' },
+        select: { periodStart: true, periodEnd: true },
+      });
+      // Condition d'exclusion : commandes dont createdAt tombe dans une période payée
+      const excludePaidPeriods = paidCycles.length > 0
+        ? { NOT: { OR: paidCycles.map(c => ({ createdAt: { gte: c.periodStart, lte: c.periodEnd } })) } }
+        : {};
+
+      // Filtre de date : normal = mois courant, force = tout sauf les cycles déjà payés
       const dateFilter = force
-        ? {} // force: inclure toutes les commandes éligibles sans restriction de date
-        : { createdAt: { gte: periodStart, lte: periodEnd } }; // normal: mois en cours seulement
+        ? {} // pas de filtre de date — les cycles payés sont exclus ci-dessus
+        : { createdAt: { gte: periodStart, lte: periodEnd } };
 
       const orderItems = await prisma.orderItem.findMany({
         where: {
@@ -86,6 +95,7 @@ router.post('/payment-cycles/generate', async (req, res) => {
           order: {
             status: { in: eligibleStatuses },
             ...dateFilter,
+            ...excludePaidPeriods, // ← toujours exclure les commandes des cycles payés
           },
         },
       });
