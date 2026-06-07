@@ -8,6 +8,7 @@ import SellerStore from './pages/SellerStore';
 import SellerReviews from './pages/SellerReviews';
 import SellerMessages from './pages/SellerMessages';
 import SellerReturns from './pages/SellerReturns';
+import SellerShipments from './pages/SellerShipments';
 
 const SellerRouter = () => {
   const { seller, page } = useSeller();
@@ -23,8 +24,9 @@ const SellerRouter = () => {
       case 'store':
       case 'settings':  return <SellerStore />;
       case 'reviews':   return <SellerReviews />;
-      case 'finance':   return <SellerStore initialTab="finance" />;
-      default:          return <SellerDashboard />;
+      case 'finance':    return <SellerStore initialTab="finance" />;
+      case 'shipments':  return <SellerShipments />;
+      default:           return <SellerDashboard />;
     }
   };
 

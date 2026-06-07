@@ -270,17 +270,70 @@ async function main() {
   console.log('✅ Commission created');
 
   // Demo banners
-  await prisma.banner.upsert({
-    where: { id: 1 },
-    update: {},
-    create: { id: 1, title: 'Bienvenue sur MARKET', imageUrl: '🛍️', linkUrl: '/', position: 'HOME_HERO', isActive: true, sortOrder: 0 }
-  }).catch(() => prisma.banner.create({ data: { title: 'Bienvenue sur MARKET', imageUrl: '🛍️', linkUrl: '/', position: 'HOME_HERO', isActive: true, sortOrder: 0 } }));
-  await prisma.banner.upsert({
-    where: { id: 2 },
-    update: {},
-    create: { id: 2, title: 'Promotions de la saison', imageUrl: '🏷️', linkUrl: '/category/electronics', position: 'HOME_HERO', isActive: true, sortOrder: 1 }
-  }).catch(() => prisma.banner.create({ data: { title: 'Promotions de la saison', imageUrl: '🏷️', linkUrl: '/category/electronics', position: 'HOME_HERO', isActive: true, sortOrder: 1 } }));
+  const b1 = await prisma.banner.findFirst({ where: { id: 1 } });
+  if (!b1) await prisma.banner.create({ data: { id: 1, title: 'MEGA SALE', subtitle: 'Bienvenue sur MARKET', description: 'Les meilleures offres', emoji: '🛍️', isActive: true, sortOrder: 0 } }).catch(()=>{});
+  const b2 = await prisma.banner.findFirst({ where: { id: 2 } });
+  if (!b2) await prisma.banner.create({ data: { id: 2, title: 'NOUVEAUTÉS', subtitle: 'Promotions de la saison', description: 'Découvrez nos dernières offres', emoji: '🏷️', isActive: true, sortOrder: 1 } }).catch(()=>{});
   console.log('✅ Banners created');
+
+  // ── MODULE LIVRAISON & LOGISTIQUE ──────────────────────────────────────────
+
+  const ZONES = [
+    { governorate: 'Tunis',       mode: 'FLEET',       sortOrder: 1 },
+    { governorate: 'Ariana',      mode: 'FLEET',       sortOrder: 2 },
+    { governorate: 'Ben Arous',   mode: 'FLEET',       sortOrder: 3 },
+    { governorate: 'Manouba',     mode: 'FLEET',       sortOrder: 4 },
+    { governorate: 'Bizerte',     mode: 'HYBRID',      sortOrder: 5 },
+    { governorate: 'Nabeul',      mode: 'HYBRID',      sortOrder: 6 },
+    { governorate: 'Zaghouan',    mode: 'HYBRID',      sortOrder: 7 },
+    { governorate: 'Sousse',      mode: 'FLEET',       sortOrder: 8 },
+    { governorate: 'Monastir',    mode: 'HYBRID',      sortOrder: 9 },
+    { governorate: 'Mahdia',      mode: 'HYBRID',      sortOrder: 10 },
+    { governorate: 'Sfax',        mode: 'FLEET',       sortOrder: 11 },
+    { governorate: 'Kairouan',    mode: 'HYBRID',      sortOrder: 12 },
+    { governorate: 'Kasserine',   mode: 'THIRD_PARTY', sortOrder: 13 },
+    { governorate: 'Sidi Bouzid', mode: 'THIRD_PARTY', sortOrder: 14 },
+    { governorate: 'Gabès',       mode: 'THIRD_PARTY', sortOrder: 15 },
+    { governorate: 'Médenine',    mode: 'THIRD_PARTY', sortOrder: 16 },
+    { governorate: 'Tataouine',   mode: 'THIRD_PARTY', sortOrder: 17 },
+    { governorate: 'Gafsa',       mode: 'THIRD_PARTY', sortOrder: 18 },
+    { governorate: 'Tozeur',      mode: 'THIRD_PARTY', sortOrder: 19 },
+    { governorate: 'Kébili',      mode: 'THIRD_PARTY', sortOrder: 20 },
+    { governorate: 'Jendouba',    mode: 'THIRD_PARTY', sortOrder: 21 },
+    { governorate: 'Béja',        mode: 'THIRD_PARTY', sortOrder: 22 },
+    { governorate: 'Kef',         mode: 'THIRD_PARTY', sortOrder: 23 },
+    { governorate: 'Siliana',     mode: 'THIRD_PARTY', sortOrder: 24 },
+  ];
+  for (const z of ZONES) {
+    await prisma.fleetZone.upsert({ where: { governorate: z.governorate }, update: { mode: z.mode }, create: z });
+  }
+  console.log('✅ 24 fleet zones created');
+
+  await prisma.vehicle.upsert({ where: { plate: 'TN-246-A' }, update: {}, create: { plate: 'TN-246-A', brand: 'Renault', model: 'Kangoo', type: 'VUL', ptacKg: 1500, capacityKg: 600, capacityL: 3000, status: 'ACTIVE' } });
+  await prisma.vehicle.upsert({ where: { plate: 'TN-801-B' }, update: {}, create: { plate: 'TN-801-B', brand: 'Peugeot', model: 'Expert', type: 'VUL', ptacKg: 2000, capacityKg: 800, capacityL: 5000, status: 'ACTIVE' } });
+  console.log('✅ Demo vehicles created');
+
+  const driverPassword = await bcrypt.hash('Driver@2024!', 10);
+  await prisma.driver.upsert({ where: { cin: '12345678' }, update: {}, create: { name: 'Ahmed Bouazizi', phone: '+216 22 000 001', cin: '12345678', licenseNo: 'B-123456', licenseType: 'B', status: 'ACTIVE', password: driverPassword } });
+  await prisma.driver.upsert({ where: { cin: '87654321' }, update: {}, create: { name: 'Mehdi Trabelsi', phone: '+216 22 000 002', cin: '87654321', licenseNo: 'B-654321', licenseType: 'B', status: 'ACTIVE', password: driverPassword } });
+  console.log('✅ Demo drivers created (PWA password: Driver@2024!)');
+
+  const aramex = await prisma.carrier.upsert({ where: { slug: 'aramex-tn' }, update: {}, create: { name: 'Aramex Tunisia', slug: 'aramex-tn', nif: '1234567/A/M/000', phone: '+216 71 000 000', email: 'ops.tn@aramex.com', type: 'NATIONAL', status: 'ACTIVE' } });
+  await prisma.carrierContract.upsert({ where: { ref: 'CTR-ARAMEX-2024' }, update: {}, create: { carrierId: aramex.id, ref: 'CTR-ARAMEX-2024', status: 'ACTIVE', startDate: new Date('2024-01-01'), billingMode: 'PER_SHIPMENT', slaDays: 3, penaltyPct: 5 } });
+  const grids = [
+    { governorate: 'ALL', minWeightKg: 0,  maxWeightKg: 3,  basePrice: 8.0,  codSurcharge: 2, fragileExtra: 3, expressExtra: 5 },
+    { governorate: 'ALL', minWeightKg: 3,  maxWeightKg: 10, basePrice: 12.0, codSurcharge: 2, fragileExtra: 4, expressExtra: 7 },
+    { governorate: 'ALL', minWeightKg: 10, maxWeightKg: 30, basePrice: 18.0, codSurcharge: 3, fragileExtra: 5, expressExtra: 10 },
+  ];
+  for (const g of grids) {
+    const ex = await prisma.pricingGrid.findFirst({ where: { carrierId: aramex.id, minWeightKg: g.minWeightKg, maxWeightKg: g.maxWeightKg } });
+    if (!ex) await prisma.pricingGrid.create({ data: { carrierId: aramex.id, ...g } });
+  }
+  console.log('✅ Carrier Aramex TN + pricing created');
+
+  const existingRule = await prisma.shippingRule.findFirst({ where: { name: 'Standard National' } });
+  if (!existingRule) await prisma.shippingRule.create({ data: { name: 'Standard National', governorate: 'ALL', freeAbove: 200, basePrice: 25, expressExtra: 15, isActive: true, priority: 0 } });
+  console.log('✅ Default shipping rule created');
 
   console.log('🎉 Seed completed!');
 }

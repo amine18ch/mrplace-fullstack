@@ -1,5 +1,7 @@
 import AdminApp from './admin/AdminApp';
 import SellerApp from './seller/SellerApp';
+import DriverApp from './driver/DriverApp';
+import TrackingPage from './pages/TrackingPage';
 import { AppProvider, useApp } from './context/AppContext';
 import { TopBar, Header, CategoryBar, Footer, Toasts, LoginModal, MobileBottomNav } from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -52,6 +54,8 @@ const AppInner = () => (
 export default function App() {
   if (window.location.pathname.startsWith('/admin')) return <AdminApp />;
   if (window.location.pathname.startsWith('/seller')) return <SellerApp />;
+  if (window.location.pathname.startsWith('/driver')) return <DriverApp />;
+  if (window.location.pathname.startsWith('/tracking')) return <TrackingPage />;
   return (
     <AppProvider>
       <AppInner />

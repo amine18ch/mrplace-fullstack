@@ -201,6 +201,7 @@ model OrderFulfillment {
   status         String   @default("EN_ATTENTE") // EN_ATTENTE | EN_PREPARATION | EXPEDIEE | LIVREE
   trackingNumber String?
   note           String?
+  shipment       Shipment?
   updatedAt      DateTime @updatedAt
   createdAt      DateTime @default(now())
 
@@ -454,5 +455,286 @@ model PaymentCycle {
   netAmount   Float
   status      String   @default("PENDING")
   paidAt      DateTime?
+  createdAt   DateTime @default(now())
+}
+
+// ── MODULE LIVRAISON & LOGISTIQUE ─────────────────────────────────────────────
+
+model Shipment {
+  id                Int               @id @default(autoincrement())
+  // Lien vers OrderFulfillment (1-to-1 optionnel)
+  fulfillmentId     Int?              @unique
+  fulfillment       OrderFulfillment? @relation(fields:[fulfillmentId], references:[id])
+  orderId           Int
+  sellerId          Int
+  // Mode et statut
+  mode              String            @default("FLEET") // FLEET | THIRD_PARTY
+  status            String            @default("DRAFT")
+  // Caractéristiques physiques
+  weightKg          Float             @default(0)
+  isFragile         Boolean           @default(false)
+  declaredValue     Float             @default(0)
+  // COD
+  isCod             Boolean           @default(false)
+  codAmount         Float             @default(0)
+  // SLA
+  isExpress         Boolean           @default(false)
+  estimatedDelivery DateTime?
+  // Adresses JSON
+  pickupAddress     String            @default("{}")
+  deliveryAddress   String            @default("{}")
+  // Routage
+  routingRationale  String            @default("")
+  // Suivi
+  trackingRef       String?           @unique
+  // Affectation flotte
+  tourId            Int?
+  tour              Tour?             @relation(fields:[tourId], references:[id])
+  driverId          Int?
+  driver            Driver?           @relation(fields:[driverId], references:[id])
+  vehicleId         Int?
+  vehicle           Vehicle?          @relation(fields:[vehicleId], references:[id])
+  // Affectation 3PL
+  carrierId         Int?
+  carrier           Carrier?          @relation(fields:[carrierId], references:[id])
+  // Relations
+  events            ShipmentEvent[]
+  codCollection     CodCollection?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+}
+
+model ShipmentEvent {
+  id         Int      @id @default(autoincrement())
+  shipment   Shipment @relation(fields:[shipmentId], references:[id])
+  shipmentId Int
+  status     String
+  note       String   @default("")
+  createdBy  String   @default("SYSTEM")
+  actorId    Int?
+  lat        Float?
+  lng        Float?
+  createdAt  DateTime @default(now())
+}
+
+// Zones géographiques couvertes par la flotte propre
+model FleetZone {
+  id          Int     @id @default(autoincrement())
+  governorate String  @unique
+  mode        String  @default("FLEET") // FLEET | HYBRID | THIRD_PARTY
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+}
+
+model Vehicle {
+  id          Int          @id @default(autoincrement())
+  plate       String       @unique
+  brand       String
+  model       String       @default("")
+  type        String       @default("VL") // VL | VUL | PL | MOTO
+  ptacKg      Float        @default(3500)
+  capacityKg  Float        @default(500)
+  capacityL   Float        @default(1000)
+  status      String       @default("ACTIVE") // ACTIVE | MAINTENANCE | OUT_OF_SERVICE
+  assignedDriverId Int?
+  docs        VehicleDoc[]
+  shipments   Shipment[]
+  tours       Tour[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model VehicleDoc {
+  id         Int      @id @default(autoincrement())
+  vehicle    Vehicle  @relation(fields:[vehicleId], references:[id], onDelete:Cascade)
+  vehicleId  Int
+  type       String   // CARTE_GRISE | ASSURANCE | VISITE_TECHNIQUE | VIGNETTE | AUTORISATION_MT | ATT
+  url        String
+  expiresAt  DateTime?
+  isExpired  Boolean  @default(false)
+  alertSent  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Driver {
+  id          Int           @id @default(autoincrement())
+  name        String
+  phone       String
+  cin         String        @unique
+  licenseNo   String
+  licenseType String        @default("B") // B | C | EC
+  status      String        @default("ACTIVE") // ACTIVE | OFF | SUSPENDED
+  codBalance  Float         @default(0)
+  password    String?       // bcrypt — accès PWA chauffeur
+  docs        DriverDoc[]
+  shipments   Shipment[]
+  tours       Tour[]
+  settlements CodSettlement[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model DriverDoc {
+  id         Int      @id @default(autoincrement())
+  driver     Driver   @relation(fields:[driverId], references:[id], onDelete:Cascade)
+  driverId   Int
+  type       String   // PERMIS | CIN | VISITE_MEDICALE
+  url        String
+  expiresAt  DateTime?
+  isExpired  Boolean  @default(false)
+  alertSent  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Tour {
+  id           Int             @id @default(autoincrement())
+  date         DateTime
+  driver       Driver          @relation(fields:[driverId], references:[id])
+  driverId     Int
+  vehicle      Vehicle         @relation(fields:[vehicleId], references:[id])
+  vehicleId    Int
+  status       String          @default("PLANNED") // PLANNED | IN_PROGRESS | COMPLETED | CANCELLED
+  kmEstimated  Float           @default(0)
+  kmActual     Float           @default(0)
+  departAt     DateTime?
+  returnAt     DateTime?
+  codTotal     Float           @default(0)
+  codCollected Float           @default(0)
+  notes        String          @default("")
+  stops        TourStop[]
+  shipments    Shipment[]
+  settlements  CodSettlement[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+model TourStop {
+  id         Int      @id @default(autoincrement())
+  tour       Tour     @relation(fields:[tourId], references:[id])
+  tourId     Int
+  shipmentId Int
+  position   Int      @default(0)
+  status     String   @default("PENDING") // PENDING | DONE | FAILED | SKIPPED
+  failReason String   @default("")
+  notes      String   @default("")
+  doneAt     DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model Carrier {
+  id           Int               @id @default(autoincrement())
+  name         String
+  slug         String            @unique
+  nif          String            @default("")
+  rne          String            @default("")
+  phone        String            @default("")
+  email        String            @default("")
+  type         String            @default("NATIONAL") // NATIONAL | INTERNATIONAL | EXPRESS | COLD_CHAIN
+  status       String            @default("ACTIVE") // ACTIVE | INACTIVE | KYC_PENDING
+  contracts    CarrierContract[]
+  pricingGrids PricingGrid[]
+  shipments    Shipment[]
+  invoices     CarrierInvoice[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+model CarrierContract {
+  id          Int      @id @default(autoincrement())
+  carrier     Carrier  @relation(fields:[carrierId], references:[id])
+  carrierId   Int
+  ref         String   @unique
+  status      String   @default("ACTIVE") // DRAFT | ACTIVE | TERMINATED
+  startDate   DateTime
+  endDate     DateTime?
+  billingMode String   @default("PER_SHIPMENT") // PER_SHIPMENT | MONTHLY
+  slaDays     Int      @default(3)
+  penaltyPct  Float    @default(0)
+  docUrl      String   @default("")
+  createdAt   DateTime @default(now())
+}
+
+model PricingGrid {
+  id           Int     @id @default(autoincrement())
+  carrier      Carrier @relation(fields:[carrierId], references:[id])
+  carrierId    Int
+  governorate  String  @default("ALL")
+  minWeightKg  Float   @default(0)
+  maxWeightKg  Float   @default(30)
+  basePrice    Float
+  codSurcharge Float   @default(0)
+  fragileExtra Float   @default(0)
+  expressExtra Float   @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model CarrierInvoice {
+  id          Int      @id @default(autoincrement())
+  carrier     Carrier  @relation(fields:[carrierId], references:[id])
+  carrierId   Int
+  ref         String
+  amount      Float
+  status      String   @default("PENDING") // PENDING | MATCHED | PAID | DISPUTED
+  periodStart DateTime
+  periodEnd   DateTime
+  docUrl      String   @default("")
+  createdAt   DateTime @default(now())
+}
+
+model ShippingRule {
+  id           Int      @id @default(autoincrement())
+  name         String
+  governorate  String   @default("ALL")
+  sellerId     Int?
+  freeAbove    Float    @default(200)
+  basePrice    Float    @default(25)
+  expressExtra Float    @default(15)
+  isActive     Boolean  @default(true)
+  priority     Int      @default(0)
+  createdAt    DateTime @default(now())
+}
+
+model CodCollection {
+  id           Int            @id @default(autoincrement())
+  shipment     Shipment       @relation(fields:[shipmentId], references:[id])
+  shipmentId   Int            @unique
+  driverId     Int
+  amount       Float
+  method       String         @default("CASH") // CASH | TPE
+  signatureUrl String         @default("")
+  photoUrl     String         @default("")
+  collectedAt  DateTime       @default(now())
+  settlementId Int?
+  settlement   CodSettlement? @relation(fields:[settlementId], references:[id])
+}
+
+model CodSettlement {
+  id            Int             @id @default(autoincrement())
+  driver        Driver          @relation(fields:[driverId], references:[id])
+  driverId      Int
+  tour          Tour?           @relation(fields:[tourId], references:[id])
+  tourId        Int?
+  carrierId     Int?
+  totalExpected Float
+  totalActual   Float
+  diff          Float           @default(0)
+  status        String          @default("PENDING") // PENDING | VALIDATED | DISPUTED
+  validatedBy   Int?
+  validatedAt   DateTime?
+  notes         String          @default("")
+  collections   CodCollection[]
+  createdAt     DateTime        @default(now())
+}
+
+model ComplianceAlert {
+  id          Int      @id @default(autoincrement())
+  type        String   // VEHICLE_DOC | DRIVER_DOC
+  entityType  String   // VEHICLE | DRIVER
+  entityId    Int
+  docType     String
+  expiresAt   DateTime
+  daysLeft    Int
+  severity    String   @default("INFO") // INFO | WARNING | CRITICAL | EXPIRED
+  isResolved  Boolean  @default(false)
   createdAt   DateTime @default(now())
 }

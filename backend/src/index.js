@@ -49,6 +49,7 @@ app.use('/api/seller/returns',      require('./routes/seller/returns'));
 app.use('/api/seller/messages',     require('./routes/seller/messages'));
 app.use('/api/seller/notifications', require('./routes/seller/notifications'));
 app.use('/api/seller/register',     require('./routes/seller/register'));
+app.use('/api/seller/shipments',    require('./routes/seller/shipments'));
 
 // Admin routes
 const { adminAuth } = require('./middleware/adminAuth');
@@ -71,6 +72,19 @@ app.use('/api/admin/admins',      adminAuth, require('./routes/admin/admins'));
 app.use('/api/admin/documents',   require('./routes/admin/documents'));
 app.use('/api/admin/attributes', adminAuth, require('./routes/admin/attributes'));
 app.use('/api/admin/returns',    adminAuth, require('./routes/admin/returns'));
+// Livraison & Logistique
+app.use('/api/admin/delivery',   adminAuth, require('./routes/admin/delivery'));
+app.use('/api/admin/fleet',      adminAuth, require('./routes/admin/fleet'));
+app.use('/api/admin/tours',      adminAuth, require('./routes/admin/tours'));
+app.use('/api/admin/carriers',   adminAuth, require('./routes/admin/carriers'));
+app.use('/api/admin/cod',        adminAuth, require('./routes/admin/cod'));
+
+// Driver PWA (token dédié isDriver)
+app.use('/api/driver/auth',      require('./routes/driver/auth'));
+app.use('/api/driver/tours',     require('./routes/driver/tours'));
+
+// Tracking public (sans auth)
+app.use('/api/tracking',         require('./routes/tracking'));
 
 // Serve frontend static files if dist exists
 if (fs.existsSync(FRONTEND_DIST)) {
@@ -80,6 +94,10 @@ if (fs.existsSync(FRONTEND_DIST)) {
   app.get('/admin/*',  (req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
   app.get('/seller',   (req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
   app.get('/seller/*', (req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
+  app.get('/driver',   (req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
+  app.get('/driver/*', (req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
+  app.get('/tracking', (req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
+  app.get('/tracking/*', (req, res) => res.sendFile(path.join(FRONTEND_DIST, 'index.html')));
   app.get('*', (req, res) => {
     res.sendFile(path.join(FRONTEND_DIST, 'index.html'));
   });

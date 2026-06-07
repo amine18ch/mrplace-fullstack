@@ -26,6 +26,22 @@ const NAV = [
     ],
   },
 
+  // ── Groupe Livraison & Logistique (collapsible)
+  {
+    id: '_delivery_group',
+    label: 'Livraison & Logistique',
+    icon: 'M1 3h15v13H1zM16 8h4l3 3v5h-7zM5.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3z',
+    roles: ['SUPER_ADMIN','MODERATEUR','COMPTABLE'],
+    group: true,
+    children: [
+      { id: 'delivery',  label: 'Expéditions',    icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+      { id: 'fleet',     label: 'Flotte',         icon: 'M1 3h15v13H1zM16 8h4l3 3v5h-7zM5.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM18.5 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3z' },
+      { id: 'tours',     label: 'Tournées',       icon: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7' },
+      { id: 'carriers',  label: 'Transporteurs 3PL', icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+      { id: 'cod',       label: 'COD / Caisse',   icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
+    ],
+  },
+
   { id: 'documents',  label: 'Documents officiels', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', roles: ['SUPER_ADMIN','COMPTABLE','MODERATEUR'] },
   { id: 'contracts',  label: 'Contrats vendeurs', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', roles: ['SUPER_ADMIN','MODERATEUR'] },
   { id: 'settings',   label: 'Paramètres',       icon: 'M12 15a3 3 0 100-6 3 3 0 000 6zM19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z', roles: ['SUPER_ADMIN'] },
@@ -53,8 +69,12 @@ const Svg = ({ path, size = 18 }) => (
 
 const SidebarNav = ({ items, currentAdminPage, navigateAdmin, notifications, admin, onClose }) => {
   const MARKETING_CHILD_IDS = ['marketing','banners','flash-sales'];
+  const DELIVERY_CHILD_IDS  = ['delivery','fleet','tours','carriers','cod'];
   const isMarketingActive = MARKETING_CHILD_IDS.includes(currentAdminPage);
-  const [groupOpen, setGroupOpen] = useState(isMarketingActive);
+  const isDeliveryActive  = DELIVERY_CHILD_IDS.includes(currentAdminPage);
+  const [groupOpenMap, setGroupOpenMap] = useState({ _marketing_group: isMarketingActive, _delivery_group: isDeliveryActive });
+  const setGroupOpen = (id, val) => setGroupOpenMap(m => ({ ...m, [id]: val !== undefined ? val : !m[id] }));
+  const groupOpen = (id) => groupOpenMap[id] ?? false;
 
   return (
     <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
@@ -70,18 +90,18 @@ const SidebarNav = ({ items, currentAdminPage, navigateAdmin, notifications, adm
             <div key={item.id}>
               {/* En-tête du groupe */}
               <button
-                onClick={() => setGroupOpen(o => !o)}
+                onClick={() => setGroupOpen(item.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${groupActive ? 'text-violet-400 bg-violet-500/10' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}`}>
                 <Svg path={item.icon} />
                 <span className="flex-1 text-left font-medium">{item.label}</span>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
-                  className={`transition-transform ${groupOpen ? 'rotate-180' : ''}`}>
+                  className={`transition-transform ${groupOpen(item.id) ? 'rotate-180' : ''}`}>
                   <path d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
 
               {/* Enfants */}
-              {groupOpen && (
+              {groupOpen(item.id) && (
                 <div className="mt-0.5 ml-3 pl-3 border-l border-slate-700/50 space-y-0.5">
                   {item.children.map(child => {
                     const active = currentAdminPage === child.id;
